@@ -31,8 +31,12 @@ export const useAuthStore = create<AuthStore>((set) => ({
   signUp: async (email, password) => {
     set({ loading: true })
     const sb = createClient()
-    const { error } = await sb.auth.signUp({ email, password })
+    const { data, error } = await sb.auth.signUp({ email, password })
     set({ loading: false })
+    // Supabase returns user: null (no error) when email is already registered
+    if (!error && !data.user) {
+      return { error: 'Questa email è già registrata. Prova ad accedere o usa Google.' }
+    }
     return { error: error?.message ?? null }
   },
 
