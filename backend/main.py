@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.routers import margin, search, outreach, scenarios
 
-app = FastAPI(title="SourceAI API", version="1.0.0")
+app = FastAPI(title="SourceAI API", version="1.0.0", redirect_slashes=False)
 
 app.add_middleware(
     CORSMiddleware,
