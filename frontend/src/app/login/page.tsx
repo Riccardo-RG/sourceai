@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/store/authStore'
+import { createClient } from '@/lib/supabase'
 
 function GoogleIcon() {
   return (
@@ -22,6 +23,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [resetSent, setResetSent] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -85,7 +87,23 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground" htmlFor="password">Password</label>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-foreground" htmlFor="password">Password</label>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!email) { setError('Inserisci prima la tua email'); return }
+                    const sb = createClient()
+                    await sb.auth.resetPasswordForEmail(email, {
+                      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+                    })
+                    setResetSent(true)
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground transition"
+                >
+                  Password dimenticata?
+                </button>
+              </div>
               <input
                 id="password"
                 type="password"
@@ -98,9 +116,8 @@ export default function LoginPage() {
               />
             </div>
 
-            {error && (
-              <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
-            )}
+            {error && <p className="text-sm text-red-500 dark:text-red-400">{error}</p>}
+            {resetSent && <p className="text-sm text-green-600 dark:text-green-400">Email inviata! Controlla la tua casella.</p>}
 
             <button
               type="submit"
