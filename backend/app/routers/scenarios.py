@@ -10,7 +10,7 @@ from app.models.scenario import ScenarioCreate
 router = APIRouter()
 
 
-@router.get("/")
+@router.get("")
 def list_scenarios(user_id: str = Depends(get_user_id)):
     sb = get_supabase()
     result = (
@@ -23,7 +23,7 @@ def list_scenarios(user_id: str = Depends(get_user_id)):
     return result.data
 
 
-@router.post("/", status_code=201)
+@router.post("", status_code=201)
 def create_scenario(body: ScenarioCreate, user_id: str = Depends(get_user_id)):
     sb = get_supabase()
     entry = {

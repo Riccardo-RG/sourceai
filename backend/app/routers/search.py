@@ -7,7 +7,7 @@ from app.services.ai_service import analyze_product
 router = APIRouter()
 
 
-@router.post("/", response_model=SearchResponse)
+@router.post("", response_model=SearchResponse)
 async def search(req: SearchRequest):
     if not req.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
