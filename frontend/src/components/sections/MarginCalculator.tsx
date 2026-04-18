@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -65,9 +65,11 @@ function MetricCard({ label, tooltip, abs, pct, showBar = false }: {
 }
 
 export default function MarginCalculator() {
-  const { inputs, result, selectedPlatform, setInput, setPlatform, saveScenario, scenarios, loadScenario, deleteScenario } = useMarginStore()
+  const { inputs, result, selectedPlatform, setInput, setPlatform, saveScenario, scenarios, loadScenario, deleteScenario, hydrateScenarios } = useMarginStore()
   const [scenarioName, setScenarioName] = useState('')
   const [showSave, setShowSave] = useState(false)
+
+  useEffect(() => { hydrateScenarios() }, [hydrateScenarios])
   const f = (key: keyof MarginInputs) => (v: number) => setInput(key, v)
 
   return (

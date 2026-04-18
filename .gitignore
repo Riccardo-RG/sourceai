@@ -33,3 +33,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# ── MCP (contiene token segreti) ─────────────────────
+.mcp.json

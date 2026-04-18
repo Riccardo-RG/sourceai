@@ -1,4 +1,10 @@
 import { create } from 'zustand'
+import {
+  fetchOutreach,
+  createOutreach,
+  updateOutreach,
+  deleteOutreach,
+} from '@/lib/api'
 
 export type OutreachStatus = 'inviato' | 'in_attesa' | 'risposto' | 'trattativa' | 'chiuso'
 
@@ -13,63 +19,92 @@ export interface OutreachEntry {
   note?: string
 }
 
-interface OutreachStore {
-  entries: OutreachEntry[]
-  addEntry: (supplier_id: string, supplier_name: string, product_query: string) => void
-  updateStatus: (id: string, status: OutreachStatus) => void
-  addNote: (id: string, note: string) => void
-  removeEntry: (id: string) => void
+function parseEntry(raw: unknown): OutreachEntry {
+  const r = raw as Record<string, unknown>
+  return {
+    ...(raw as OutreachEntry),
+    sent_at: new Date(r.sent_at as string),
+    last_update: new Date(r.last_update as string),
+  }
 }
 
-// Mock entries so the tracker non è vuoto al primo caricamento
-const MOCK_ENTRIES: OutreachEntry[] = [
-  {
-    id: 'mock-1',
-    supplier_id: '3',
-    supplier_name: 'GreenDrink Wholesale — IT',
-    product_query: 'borraccia termica',
-    status: 'risposto',
-    sent_at: new Date(Date.now() - 1000 * 60 * 60 * 48),
-    last_update: new Date(Date.now() - 1000 * 60 * 60 * 12),
-    note: 'Disponibili 200 unità a magazzino, prezzo €7.80/u per ordini > 100.',
-  },
-]
+interface OutreachStore {
+  entries: OutreachEntry[]
+  hydrated: boolean
+  hydrate: () => Promise<void>
+  addEntry: (supplier_id: string, supplier_name: string, product_query: string) => Promise<void>
+  updateStatus: (id: string, status: OutreachStatus) => Promise<void>
+  addNote: (id: string, note: string) => Promise<void>
+  removeEntry: (id: string) => Promise<void>
+}
 
 export const useOutreachStore = create<OutreachStore>((set, get) => ({
-  entries: MOCK_ENTRIES,
+  entries: [],
+  hydrated: false,
 
-  addEntry: (supplier_id, supplier_name, product_query) => {
-    const exists = get().entries.find((e) => e.supplier_id === supplier_id && e.product_query === product_query)
+  hydrate: async () => {
+    if (get().hydrated) return
+    try {
+      const raw = await fetchOutreach()
+      set({ entries: raw.map(parseEntry), hydrated: true })
+    } catch {
+      set({ hydrated: true })
+    }
+  },
+
+  addEntry: async (supplier_id, supplier_name, product_query) => {
+    const exists = get().entries.find(
+      (e) => e.supplier_id === supplier_id && e.product_query === product_query,
+    )
     if (exists) return
+
+    const tempId = crypto.randomUUID()
+    const now = new Date()
     const entry: OutreachEntry = {
-      id: crypto.randomUUID(),
+      id: tempId,
       supplier_id,
       supplier_name,
       product_query,
       status: 'inviato',
-      sent_at: new Date(),
-      last_update: new Date(),
+      sent_at: now,
+      last_update: now,
     }
-    set((state) => ({ entries: [entry, ...state.entries] }))
+    set((s) => ({ entries: [entry, ...s.entries] }))
+
+    try {
+      const saved = await createOutreach({ supplier_id, supplier_name, product_query })
+      set((s) => ({
+        entries: s.entries.map((e) => (e.id === tempId ? parseEntry(saved) : e)),
+      }))
+    } catch { /* keep local entry */ }
   },
 
-  updateStatus: (id, status) => {
-    set((state) => ({
-      entries: state.entries.map((e) =>
-        e.id === id ? { ...e, status, last_update: new Date() } : e
+  updateStatus: async (id, status) => {
+    set((s) => ({
+      entries: s.entries.map((e) =>
+        e.id === id ? { ...e, status, last_update: new Date() } : e,
       ),
     }))
+    try {
+      await updateOutreach(id, { status })
+    } catch { /* UI already updated */ }
   },
 
-  addNote: (id, note) => {
-    set((state) => ({
-      entries: state.entries.map((e) =>
-        e.id === id ? { ...e, note, last_update: new Date() } : e
+  addNote: async (id, note) => {
+    set((s) => ({
+      entries: s.entries.map((e) =>
+        e.id === id ? { ...e, note, last_update: new Date() } : e,
       ),
     }))
+    try {
+      await updateOutreach(id, { note })
+    } catch { /* UI already updated */ }
   },
 
-  removeEntry: (id) => {
-    set((state) => ({ entries: state.entries.filter((e) => e.id !== id) }))
+  removeEntry: async (id) => {
+    set((s) => ({ entries: s.entries.filter((e) => e.id !== id) }))
+    try {
+      await deleteOutreach(id)
+    } catch { /* UI already updated */ }
   },
 }))

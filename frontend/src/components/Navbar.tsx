@@ -1,6 +1,10 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useTheme } from './ThemeProvider'
+import { useAuthStore } from '@/store/authStore'
 
 function SunIcon() {
   return (
@@ -19,8 +23,86 @@ function MoonIcon() {
   )
 }
 
+function AuthSection() {
+  const router = useRouter()
+  const { user, initialized, signOut } = useAuthStore()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  // Still loading — show placeholder to avoid layout shift
+  if (!initialized) {
+    return <div className="w-9 h-9 rounded-xl bg-muted animate-pulse" />
+  }
+
+  // Not logged in — show Accedi + Registrati
+  if (!user) {
+    return (
+      <div className="flex items-center gap-2">
+        <Link
+          href="/login"
+          className="px-3.5 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition"
+        >
+          Accedi
+        </Link>
+        <Link
+          href="/signup"
+          className="px-3.5 py-1.5 rounded-xl bg-foreground text-background text-sm font-semibold hover:opacity-90 transition"
+        >
+          Registrati
+        </Link>
+      </div>
+    )
+  }
+
+  // Logged in — avatar with dropdown
+  const initials = user.email?.slice(0, 2).toUpperCase() ?? 'U'
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-9 h-9 rounded-xl bg-muted border border-border flex items-center justify-center text-sm font-semibold text-foreground hover:bg-muted/80 transition"
+        aria-label="Menu utente"
+      >
+        {initials}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-11 w-56 rounded-2xl border border-border bg-card shadow-lg py-2 z-50">
+          <div className="px-4 py-2 border-b border-border mb-1">
+            <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+          </div>
+          <button
+            onClick={async () => {
+              setOpen(false)
+              await signOut()
+              router.push('/login')
+            }}
+            className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/60 transition"
+          >
+            Esci
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Navbar() {
   const { theme, toggle } = useTheme()
+  const { initialize, initialized } = useAuthStore()
+
+  useEffect(() => {
+    if (!initialized) initialize()
+  }, [initialize, initialized])
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/70 bg-card/90 backdrop-blur-md">
@@ -43,7 +125,7 @@ export default function Navbar() {
         </div>
 
         {/* Right */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <p className="text-base text-muted-foreground hidden sm:block">
             AI Sourcing per seller online
           </p>
@@ -54,6 +136,7 @@ export default function Navbar() {
           >
             {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
           </button>
+          <AuthSection />
         </div>
       </div>
     </header>

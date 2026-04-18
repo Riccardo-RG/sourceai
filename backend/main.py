@@ -1,20 +1,25 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import margin
 
-app = FastAPI(title="SourceAI API", version="0.1.0")
+from app.config import settings
+from app.routers import margin, search, outreach, scenarios
+
+app = FastAPI(title="SourceAI API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(margin.router, prefix="/api/margin", tags=["margin"])
+app.include_router(search.router, prefix="/api/search", tags=["search"])
+app.include_router(outreach.router, prefix="/api/outreach", tags=["outreach"])
+app.include_router(scenarios.router, prefix="/api/scenarios", tags=["scenarios"])
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": "1.0.0"}

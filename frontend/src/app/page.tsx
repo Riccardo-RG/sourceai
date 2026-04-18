@@ -7,9 +7,10 @@ import MarginCalculator from '@/components/sections/MarginCalculator'
 import SupplierList from '@/components/sections/SupplierList'
 import ViabilityScore from '@/components/sections/ViabilityScore'
 import OutreachTracker from '@/components/sections/OutreachTracker'
-import { MOCK_SUPPLIERS } from '@/lib/mockSuppliers'
+import { searchProduct } from '@/lib/api'
+import { Supplier } from '@/types'
 
-type Step = 'idle' | 'validating' | 'sourcing' | 'done'
+type Step = 'idle' | 'validating' | 'sourcing' | 'done' | 'error'
 
 const HOW_IT_WORKS = [
   { n: '01', label: 'Valida il mercato', desc: 'Analisi domanda, competizione e potenziale di margine.' },
@@ -21,14 +22,29 @@ const HOW_IT_WORKS = [
 export default function Home() {
   const [step, setStep] = useState<Step>('idle')
   const [query, setQuery] = useState('')
+  const [viabilityData, setViabilityData] = useState<object | null>(null)
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
 
-  const handleSearch = async (q: string) => {
+  const handleSearch = async (q: string, category?: string) => {
     setQuery(q)
     setStep('validating')
-    await new Promise((r) => setTimeout(r, 1400))
-    setStep('sourcing')
-    await new Promise((r) => setTimeout(r, 1200))
-    setStep('done')
+
+    // Switch to 'sourcing' after 2.5s to show progressive UX while API runs
+    const timer = setTimeout(
+      () => setStep((s) => (s === 'validating' ? 'sourcing' : s)),
+      2500,
+    )
+
+    try {
+      const data = await searchProduct(q, category)
+      setViabilityData(data.viability)
+      setSuppliers(data.suppliers)
+      setStep('done')
+    } catch {
+      setStep('error')
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   const isLoading = step === 'validating' || step === 'sourcing'
@@ -62,12 +78,21 @@ export default function Home() {
         {/* ── Results ──────────────────────────── */}
         <div className="max-w-5xl mx-auto px-8 py-12 space-y-14">
 
+          {/* Error */}
+          {step === 'error' && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900 px-6 py-5 text-base text-red-700 dark:text-red-400">
+              Qualcosa è andato storto. Assicurati che il backend sia attivo e riprova.
+            </div>
+          )}
+
           {/* Step 01 */}
-          {step !== 'idle' && (
+          {step !== 'idle' && step !== 'error' && (
             <section className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
               <StepHeader number="01" label="Validazione mercato"
                 isLoading={step === 'validating'} loadingText={`Analizzo "${query}"…`} />
-              {step !== 'validating' && <ViabilityScore query={query} />}
+              {step !== 'validating' && viabilityData && (
+                <ViabilityScore data={viabilityData} query={query} />
+              )}
             </section>
           )}
 
@@ -76,7 +101,7 @@ export default function Home() {
             <section className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
               <StepHeader number="02" label="Supplier trovati"
                 isLoading={step === 'sourcing'} loadingText="Cerco i migliori supplier…" />
-              {step === 'done' && <SupplierList suppliers={MOCK_SUPPLIERS} query={query} />}
+              {step === 'done' && <SupplierList suppliers={suppliers} query={query} />}
             </section>
           )}
 

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { MarginInputs, MarginResult, MarginScenario } from '@/types'
+import { fetchScenarios, createScenario, deleteScenario as deleteScenarioApi } from '@/lib/api'
 
 const PLATFORM_FEES: Record<string, number> = {
   Shopify: 2.0,
@@ -55,12 +56,14 @@ interface MarginStore {
   result: MarginResult
   scenarios: MarginScenario[]
   selectedPlatform: string
+  scenariosHydrated: boolean
 
   setInput: (key: keyof MarginInputs, value: number) => void
   setPlatform: (platform: string) => void
-  saveScenario: (name: string, supplierName?: string) => void
+  hydrateScenarios: () => Promise<void>
+  saveScenario: (name: string, supplierName?: string) => Promise<void>
   loadScenario: (id: string) => void
-  deleteScenario: (id: string) => void
+  deleteScenario: (id: string) => Promise<void>
 }
 
 export const useMarginStore = create<MarginStore>((set, get) => ({
@@ -68,6 +71,7 @@ export const useMarginStore = create<MarginStore>((set, get) => ({
   result: computeMargins(DEFAULT_INPUTS),
   scenarios: [],
   selectedPlatform: 'Shopify',
+  scenariosHydrated: false,
 
   setInput: (key, value) => {
     const newInputs = { ...get().inputs, [key]: value }
@@ -77,24 +81,48 @@ export const useMarginStore = create<MarginStore>((set, get) => ({
   setPlatform: (platform) => {
     const fee = PLATFORM_FEES[platform] ?? 0
     const newInputs = { ...get().inputs, platform_fee_pct: fee }
-    set({
-      selectedPlatform: platform,
-      inputs: newInputs,
-      result: computeMargins(newInputs),
-    })
+    set({ selectedPlatform: platform, inputs: newInputs, result: computeMargins(newInputs) })
   },
 
-  saveScenario: (name, supplierName) => {
+  hydrateScenarios: async () => {
+    if (get().scenariosHydrated) return
+    try {
+      const raw = await fetchScenarios()
+      const scenarios: MarginScenario[] = raw.map((s: Record<string, unknown>) => ({
+        ...s,
+        created_at: new Date(s.created_at as string),
+      }))
+      set({ scenarios, scenariosHydrated: true })
+    } catch {
+      set({ scenariosHydrated: true })
+    }
+  },
+
+  saveScenario: async (name, supplierName) => {
     const { inputs, result } = get()
+    const tempId = crypto.randomUUID()
     const scenario: MarginScenario = {
-      id: crypto.randomUUID(),
+      id: tempId,
       name,
       supplier_name: supplierName,
       inputs: { ...inputs },
       result: { ...result },
       created_at: new Date(),
     }
-    set((state) => ({ scenarios: [...state.scenarios, scenario] }))
+    set((s) => ({ scenarios: [...s.scenarios, scenario] }))
+
+    try {
+      const saved = await createScenario(
+        { name, supplier_name: supplierName, inputs: { ...inputs }, result: { ...result } },
+      )
+      set((s) => ({
+        scenarios: s.scenarios.map((sc) =>
+          sc.id === tempId ? { ...sc, id: saved.id } : sc,
+        ),
+      }))
+    } catch {
+      // Keep local scenario
+    }
   },
 
   loadScenario: (id) => {
@@ -104,8 +132,13 @@ export const useMarginStore = create<MarginStore>((set, get) => ({
     }
   },
 
-  deleteScenario: (id) => {
-    set((state) => ({ scenarios: state.scenarios.filter((s) => s.id !== id) }))
+  deleteScenario: async (id) => {
+    set((s) => ({ scenarios: s.scenarios.filter((sc) => sc.id !== id) }))
+    try {
+      await deleteScenarioApi(id)
+    } catch {
+      // Already removed from UI
+    }
   },
 }))
 

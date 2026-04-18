@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { InfoTooltip } from '@/components/ui/info-tooltip'
 import { useOutreachStore, OutreachStatus } from '@/store/outreachStore'
 
@@ -26,9 +26,11 @@ function timeAgo(date: Date): string {
 }
 
 export default function OutreachTracker() {
-  const { entries, updateStatus, addNote, removeEntry } = useOutreachStore()
+  const { entries, hydrate, updateStatus, addNote, removeEntry } = useOutreachStore()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [noteInput, setNoteInput] = useState<Record<string, string>>({})
+
+  useEffect(() => { hydrate() }, [hydrate])
 
   if (entries.length === 0) return null
 
