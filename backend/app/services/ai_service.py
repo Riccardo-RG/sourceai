@@ -279,9 +279,8 @@ async def _search_real_suppliers(
     positioning: str,
 ) -> tuple[list[dict], str]:
     """
-    Single targeted Tavily search on the most relevant B2B platform.
+    Dual Tavily search: platform-specific + open web in parallel.
     Returns (structured_supplier_cards, raw_text_for_claude_prompt).
-    One Tavily call instead of two — merged with the general supplier search.
     """
     from tavily import AsyncTavilyClient
     from urllib.parse import urlparse
@@ -289,36 +288,51 @@ async def _search_real_suppliers(
     client = AsyncTavilyClient(api_key=api_key)
     market_upper = market.upper()
 
-    # Pick the most relevant B2B source based on positioning + market
+    # ── Platform-specific query (known B2B directories) ──────────────────────
     if positioning == "artisanal":
-        # Faire and Ankorstore curate small independent artisan brands
         if market_upper in ("EUROPE", "GB"):
-            sq = f"site:ankorstore.com {query} brand"
+            platform_sq = f"site:ankorstore.com {query}"
         else:
-            sq = f"site:faire.com {query} brand"
+            platform_sq = f"site:faire.com {query}"
     elif positioning == "premium":
         if market_upper in ("EUROPE", "GB"):
-            sq = f"site:europages.co.uk {query} manufacturer"
+            platform_sq = f"site:europages.co.uk {query} manufacturer"
         else:
-            sq = f"site:alibaba.com {query} verified supplier premium"
+            platform_sq = f"site:alibaba.com {query} verified supplier"
     elif positioning == "dropshipping":
-        sq = f"site:spocket.co {query} supplier"
+        platform_sq = f"site:spocket.co {query}"
     elif market_upper == "LATAM":
-        sq = f"site:made-in-china.com {query} manufacturer"
+        platform_sq = f"site:made-in-china.com {query} manufacturer"
     else:
-        sq = f"site:alibaba.com {query} supplier manufacturer"
+        platform_sq = f"site:alibaba.com {query} supplier manufacturer"
 
-    raw_results: list[dict] = []
+    # ── Open web query (finds suppliers with their own websites) ─────────────
+    market_conf = MARKET_CONFIG.get(market_upper, MARKET_CONFIG["GLOBAL"])
+    market_name = market_conf.get("name", market)
+    if positioning in ("artisanal", "premium"):
+        web_sq = f"{query} fornitore produttore artigianale B2B {market_name}"
+    elif positioning == "dropshipping":
+        web_sq = f"{query} dropshipping supplier wholesale {market_name}"
+    else:
+        web_sq = f"{query} supplier wholesale manufacturer B2B {market_name}"
+
+    # ── Run both searches in parallel ────────────────────────────────────────
     try:
-        r = await client.search(sq, max_results=5, search_depth="basic")
-        raw_results = r.get("results", [])
+        platform_res, web_res = await asyncio.gather(
+            client.search(platform_sq, max_results=4, search_depth="basic"),
+            client.search(web_sq, max_results=4, search_depth="basic"),
+            return_exceptions=True,
+        )
+        platform_results = platform_res.get("results", []) if isinstance(platform_res, dict) else []
+        web_results = web_res.get("results", []) if isinstance(web_res, dict) else []
     except Exception:
         return [], "[supplier data unavailable]"
 
-    # Build plain text for Claude's supplier context
+    raw_results = platform_results + web_results
+
     supplier_text = "\n".join(
         f"- {r.get('title', '')}: {r.get('content', '')[:300]}"
-        for r in raw_results[:4]
+        for r in raw_results[:6]
     ) or "[no supplier data found]"
 
     def _platform_from_url(url: str) -> str:
@@ -329,16 +343,18 @@ async def _search_real_suppliers(
         if "made-in-china" in url: return "Made-in-China"
         if "spocket" in url:       return "Spocket"
         if "dhgate" in url:        return "DHgate"
+        if "aliexpress" in url:    return "AliExpress"
         return "Web"
 
     def _clean_name(title: str, platform: str) -> str:
         for suffix in [
             f" - {platform}", f" | {platform}", f" - {platform}.com",
             " - Europages", "| Europages", " - Alibaba.com", "- Alibaba",
-            " | Alibaba", " - Made-in-China.com",
+            " | Alibaba", " - Made-in-China.com", " – Ankorstore",
+            " | Faire", " - Faire",
         ]:
             title = title.replace(suffix, "")
-        for sep in [" - ", " | ", " — "]:
+        for sep in [" - ", " | ", " — ", " – "]:
             if sep in title:
                 title = title.split(sep)[0]
         return title.strip()[:80]
@@ -349,6 +365,8 @@ async def _search_real_suppliers(
         "/product-detail/", "/product/", "?keyword=", "/offers-for-sale",
         "/multi-search/", "showroom", "/p-detail", "offerList",
         "/products?", "/search/", "?search=", "?query=",
+        "amazon.", "ebay.", "etsy.", "instagram.", "facebook.", "linkedin.",
+        "pinterest.", "twitter.", "youtube.", "tiktok.",
     ]
 
     suppliers: list[dict] = []
@@ -382,7 +400,7 @@ async def _search_real_suppliers(
             "ai_score": 3.0,
         })
 
-        if len(suppliers) >= 5:
+        if len(suppliers) >= 6:
             break
 
     return suppliers, supplier_text
