@@ -74,7 +74,6 @@ async def get_trends_data(keyword: str, market: str = "US") -> Optional[dict]:
         "keywords": [keyword],
         "language_code": conf["language_code"],
         "time_range": "past_12_months",
-        "type": "web_search",
     }
     # GLOBAL has no location_code → worldwide trends
     if conf["location_code"] is not None:
