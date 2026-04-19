@@ -20,7 +20,7 @@ RULES:
 
 QUESTIONS TO ASK (pick based on what's still missing, in order of priority):
 1. What is the exact product? (if the query is vague or too generic)
-2. Where do they want to sell? (region: Global / Europe / North America / Latin America / Asia Pacific / Middle East — only if not clear from context)
+2. Where do they want to sell? (region: Global / Europe / United Kingdom / North America / Latin America / Asia Pacific / Middle East — only if not clear from context)
 3. What is their positioning? (premium/quality vs low price/volume vs artisanal/niche vs dropshipping)
 4. Who is their target customer? (only if it would meaningfully change the supplier strategy)
 
@@ -47,13 +47,15 @@ In this mode:
 Emit signals at the END of your message, after your text.
 
 Valid search (Mode 1 only):
-<SEARCH_READY>{"refined_query": "...", "positioning": "mass_market|artisanal|premium|dropshipping|unknown", "market": "GLOBAL|EUROPE|NORTH_AMERICA|LATAM|ASIA_PACIFIC|MIDDLE_EAST", "channel": "online|store|dropshipping", "target_customer": "...", "supplier_context": "..."}</SEARCH_READY>
+<SEARCH_READY>{"refined_query": "...", "positioning": "mass_market|artisanal|premium|dropshipping|unknown", "market": "GLOBAL|EUROPE|GB|NORTH_AMERICA|LATAM|ASIA_PACIFIC|MIDDLE_EAST", "channel": "online|store|dropshipping", "target_customer": "...", "supplier_context": "..."}</SEARCH_READY>
+
+Use "GB" specifically when the user says United Kingdom, UK, England, Britain, or similar.
 
 Invalid query (Mode 1 only):
 <INVALID_QUERY>{"reason": "..."}</INVALID_QUERY>
 
 Supplier recommendations (when user asks about sourcing WITHOUT launching a full search):
-<SUPPLIERS>{"query": "...", "market": "GLOBAL|EUROPE|NORTH_AMERICA|LATAM|ASIA_PACIFIC|MIDDLE_EAST", "platforms": ["Platform1", "Platform2", "Platform3"]}</SUPPLIERS>
+<SUPPLIERS>{"query": "...", "market": "GLOBAL|EUROPE|GB|NORTH_AMERICA|LATAM|ASIA_PACIFIC|MIDDLE_EAST", "platforms": ["Platform1", "Platform2", "Platform3"]}</SUPPLIERS>
 Available platforms: Alibaba, AliExpress, Europages, Ankorstore, Faire, DHgate, Made-in-China, Spocket, Mercado Libre
 Choose 3-4 platforms most relevant to market and positioning. Do NOT emit SUPPLIERS together with SEARCH_READY.
 

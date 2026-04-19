@@ -338,7 +338,7 @@ async def _search_real_suppliers(
     ]
 
     suppliers: list[dict] = []
-    seen_netloc: set[str] = set()
+    seen_urls: set[str] = set()
 
     for r in raw_results:
         url = r.get("url", "")
@@ -349,11 +349,9 @@ async def _search_real_suppliers(
             continue
         if any(p in url for p in skip_patterns):
             continue
-
-        netloc = urlparse(url).netloc
-        if netloc in seen_netloc:
+        if url in seen_urls:
             continue
-        seen_netloc.add(netloc)
+        seen_urls.add(url)
 
         platform = _platform_from_url(url)
         name = _clean_name(title, platform)
