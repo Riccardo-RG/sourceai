@@ -21,12 +21,11 @@ interface ProductInputProps {
 export default function ProductInput({ onSearch, isLoading }: ProductInputProps) {
   const t = useT()
   const [query, setQuery] = useState('')
-  const [category, setCategory] = useState<string | undefined>()
   const [market, setMarket] = useState('GLOBAL')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (query.trim() && !isLoading) onSearch(query.trim(), category, market)
+    if (query.trim() && !isLoading) onSearch(query.trim(), undefined, market)
   }
 
   const selectedMarket = MARKETS.find((m) => m.code === market) ?? MARKETS[0]
@@ -84,22 +83,6 @@ export default function ProductInput({ onSearch, isLoading }: ProductInputProps)
         </div>
       </form>
 
-      {/* Categories */}
-      <div className="flex flex-wrap gap-1.5">
-        {t.categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setCategory(category === cat ? undefined : cat)}
-            className={`text-xs px-2.5 py-1 rounded border transition-colors cursor-pointer select-none
-              ${category === cat
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-transparent text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground'
-              }`}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
     </div>
   )
 }

@@ -191,6 +191,32 @@ export interface T {
   rate_limit_title: string
   rate_limit_body: string
 
+  // Positioning & channel labels (used in context pills)
+  pos_mass_market: string
+  pos_artisanal: string
+  pos_premium: string
+  pos_dropshipping: string
+  pos_unknown: string
+  ch_online: string
+  ch_store: string
+  ch_dropshipping: string
+
+  // RealSuppliers
+  rs_no_suppliers: string
+  rs_refine: string
+  rs_found: string       // use {n} placeholder
+  rs_indicative: string
+  rs_tracked: string
+  rs_outreach_add: string
+  rs_copied: string
+  rs_email: string
+  rs_open_site: string
+
+  // SavedSuppliers
+  ss_title: string
+  ss_for: string         // use {query} placeholder
+  ss_remove: string
+
   // Miriam chat
   miriam_title: string
   miriam_placeholder: string
@@ -406,6 +432,29 @@ const en: T = {
   rate_limit_title: 'Too many searches in a short time',
   rate_limit_body: 'Wait a few seconds before launching a new search.',
 
+  pos_mass_market: 'Mass market',
+  pos_artisanal: 'Artisanal',
+  pos_premium: 'Premium',
+  pos_dropshipping: 'Dropshipping',
+  pos_unknown: '—',
+  ch_online: 'Online',
+  ch_store: 'Physical store',
+  ch_dropshipping: 'Dropshipping',
+
+  rs_no_suppliers: 'No suppliers found.',
+  rs_refine: 'Refine the query with Miriam',
+  rs_found: '{n} suppliers found',
+  rs_indicative: 'Indicative data',
+  rs_tracked: '✓ Tracked',
+  rs_outreach_add: '+ Outreach',
+  rs_copied: '✓ Copied!',
+  rs_email: '↗ Email',
+  rs_open_site: 'Open site',
+
+  ss_title: 'Saved suppliers',
+  ss_for: 'for: {query}',
+  ss_remove: 'Remove',
+
   miriam_title: 'Miriam · AI Research',
   miriam_placeholder: 'Tell me what you want to sell…',
   miriam_send: 'Send',
@@ -620,6 +669,29 @@ const it: T = {
   rate_limit_title: 'Troppe ricerche in poco tempo',
   rate_limit_body: 'Attendi qualche secondo prima di lanciare una nuova ricerca.',
 
+  pos_mass_market: 'Mass market',
+  pos_artisanal: 'Artigianale',
+  pos_premium: 'Premium',
+  pos_dropshipping: 'Dropshipping',
+  pos_unknown: '—',
+  ch_online: 'Online',
+  ch_store: 'Negozio fisico',
+  ch_dropshipping: 'Dropshipping',
+
+  rs_no_suppliers: 'Nessun fornitore trovato.',
+  rs_refine: 'Raffina la query con Miriam',
+  rs_found: '{n} fornitori trovati',
+  rs_indicative: 'Dato indicativo',
+  rs_tracked: '✓ Tracciato',
+  rs_outreach_add: '+ Outreach',
+  rs_copied: '✓ Copiata!',
+  rs_email: '↗ Email',
+  rs_open_site: 'Apri sito',
+
+  ss_title: 'Supplier salvati',
+  ss_for: 'per: {query}',
+  ss_remove: 'Rimuovi',
+
   miriam_title: 'Miriam · Ricerca AI',
   miriam_placeholder: 'Dimmi cosa vuoi vendere…',
   miriam_send: 'Invia',
@@ -833,6 +905,29 @@ const es: T = {
   miriam_cta_sub: 'Pregunta a Miriam →',
   rate_limit_title: 'Demasiadas búsquedas en poco tiempo',
   rate_limit_body: 'Espera unos segundos antes de lanzar una nueva búsqueda.',
+
+  pos_mass_market: 'Mass market',
+  pos_artisanal: 'Artesanal',
+  pos_premium: 'Premium',
+  pos_dropshipping: 'Dropshipping',
+  pos_unknown: '—',
+  ch_online: 'Online',
+  ch_store: 'Tienda física',
+  ch_dropshipping: 'Dropshipping',
+
+  rs_no_suppliers: 'No se encontraron proveedores.',
+  rs_refine: 'Refina la búsqueda con Miriam',
+  rs_found: '{n} proveedores encontrados',
+  rs_indicative: 'Dato indicativo',
+  rs_tracked: '✓ Registrado',
+  rs_outreach_add: '+ Outreach',
+  rs_copied: '✓ ¡Copiado!',
+  rs_email: '↗ Email',
+  rs_open_site: 'Abrir sitio',
+
+  ss_title: 'Proveedores guardados',
+  ss_for: 'para: {query}',
+  ss_remove: 'Eliminar',
 
   miriam_title: 'Miriam · Investigación AI',
   miriam_placeholder: 'Dime qué quieres vender…',

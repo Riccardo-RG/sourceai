@@ -3,15 +3,7 @@
 import { useState } from 'react'
 import type { RealSupplier } from '@/types'
 import { useOutreachStore } from '@/store/outreachStore'
-
-const PLATFORM_ICONS: Record<string, string> = {
-  'Alibaba': '🏭',
-  'Europages': '🇪🇺',
-  'Made-in-China': '🇨🇳',
-  'Ankorstore': '🎨',
-  'Faire': '✦',
-  'Web': '🔗',
-}
+import { useT } from '@/hooks/useT'
 
 const PLATFORM_COLORS: Record<string, string> = {
   'Alibaba': 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-300 dark:border-orange-800',
@@ -19,6 +11,8 @@ const PLATFORM_COLORS: Record<string, string> = {
   'Made-in-China': 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-800',
   'Ankorstore': 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-800',
   'Faire': 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800',
+  'Global Sources': 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:border-sky-800',
+  'Spocket': 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-300 dark:border-violet-800',
   'Web': 'bg-muted text-muted-foreground border-border',
 }
 
@@ -29,14 +23,16 @@ interface Props {
 }
 
 export default function RealSuppliers({ suppliers, query, market = 'Global' }: Props) {
+  const t = useT()
+
   if (!suppliers || suppliers.length === 0) {
     return (
       <div className="flex items-center gap-2 px-4 py-3 rounded-md border border-dashed border-border text-xs text-muted-foreground">
         <span className="text-muted-foreground/40">○</span>
         <span>
-          Nessun fornitore trovato.{' '}
-          <span className="font-medium text-foreground">Raffina la query con Miriam</span>{' '}
-          per risultati più specifici.
+          {t.rs_no_suppliers}{' '}
+          <span className="font-medium text-foreground">{t.rs_refine}</span>
+          {' '}→
         </span>
       </div>
     )
@@ -46,11 +42,11 @@ export default function RealSuppliers({ suppliers, query, market = 'Global' }: P
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <span className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-widest">
-          Supplier — {suppliers.length} trovati
+          {t.rs_found.replace('{n}', String(suppliers.length))}
         </span>
         <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 dark:text-amber-400">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-          Dato indicativo
+          {t.rs_indicative}
         </span>
       </div>
 
@@ -64,11 +60,11 @@ export default function RealSuppliers({ suppliers, query, market = 'Global' }: P
 }
 
 function SupplierCard({ supplier: s, query, market }: { supplier: RealSupplier; query: string; market: string }) {
+  const t = useT()
   const { addEntry, entries } = useOutreachStore()
   const [outreachDone, setOutreachDone] = useState(false)
   const [emailCopied, setEmailCopied] = useState(false)
 
-  const icon = PLATFORM_ICONS[s.platform] ?? '🔗'
   const badgeClass = PLATFORM_COLORS[s.platform] ?? PLATFORM_COLORS['Web']
 
   const isAlreadyTracked = entries.some(
@@ -96,7 +92,7 @@ function SupplierCard({ supplier: s, query, market }: { supplier: RealSupplier; 
 
   return (
     <div className="flex flex-col gap-2.5 p-3.5 rounded-md border border-border bg-background hover:border-primary/30 transition-colors duration-150">
-      {/* Platform + link */}
+      {/* Platform badge + external link */}
       <div className="flex items-center justify-between gap-2">
         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${badgeClass}`}>
           {s.platform}
@@ -107,7 +103,7 @@ function SupplierCard({ supplier: s, query, market }: { supplier: RealSupplier; 
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
           className="text-muted-foreground/30 hover:text-primary transition-colors"
-          title="Apri sito"
+          title={t.rs_open_site}
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
@@ -142,7 +138,7 @@ function SupplierCard({ supplier: s, query, market }: { supplier: RealSupplier; 
               ? 'text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30'
               : 'text-muted-foreground border-border hover:text-primary hover:border-primary/40 hover:bg-primary/5'}`}
         >
-          {isAlreadyTracked || outreachDone ? '✓ Tracciato' : '+ Outreach'}
+          {isAlreadyTracked || outreachDone ? t.rs_tracked : t.rs_outreach_add}
         </button>
         <button
           onClick={handleEmail}
@@ -151,7 +147,7 @@ function SupplierCard({ supplier: s, query, market }: { supplier: RealSupplier; 
               ? 'text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30'
               : 'text-muted-foreground border-border hover:text-primary hover:border-primary/40 hover:bg-primary/5'}`}
         >
-          {emailCopied ? '✓ Copiata!' : '↗ Email'}
+          {emailCopied ? t.rs_copied : t.rs_email}
         </button>
       </div>
     </div>

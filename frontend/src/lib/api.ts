@@ -77,39 +77,31 @@ export async function* streamMiriam(
 ): AsyncGenerator<{ text?: string; signal?: string; done?: boolean }> {
   const headers = await authHeaders()
 
-  // Build hidden context notes injected at the start of history
-  const hiddenNotes: ChatMessage[] = []
+  // Build a single rich hidden context note injected at the start of history
+  const hiddenParts: string[] = []
 
   if (searchContext) {
-    hiddenNotes.push({
-      role: 'assistant',
-      content: `[Confirmed search context from this session — do NOT ask about these again:
-- Product searched: "${searchContext.refined_query}"
+    hiddenParts.push(`SEARCH EXECUTED — do NOT ask about these again:
+- Product: "${searchContext.refined_query}"
 - Positioning: ${searchContext.positioning}
 - Market: ${searchContext.market.toUpperCase()}
 - Sales channel: ${searchContext.channel}
-- Target customer: ${searchContext.target_customer}
-- Supplier preference: ${searchContext.supplier_context}
-The search has been executed. The user can see results on screen.]`,
-    })
-  }
-
-  if (foundSuppliers.length > 0) {
-    hiddenNotes.push({
-      role: 'assistant',
-      content: `[Real suppliers found for this search: ${foundSuppliers.join(', ')}. The user sees their cards in the results section.]`,
-    })
+- Target customer: ${searchContext.target_customer || 'not specified'}
+- Supplier preference: ${searchContext.supplier_context || 'none'}`)
   }
 
   if (viabilitySummary) {
-    hiddenNotes.push({
-      role: 'assistant',
-      content: `[Search results summary: ${viabilitySummary}]`,
-    })
+    hiddenParts.push(`MARKET ANALYSIS RESULTS (use these to answer user questions about the product):
+${viabilitySummary}`)
   }
 
-  const contextualMessages: ChatMessage[] = hiddenNotes.length > 0
-    ? [...hiddenNotes, ...messages]
+  if (foundSuppliers.length > 0) {
+    hiddenParts.push(`SUPPLIERS FOUND (visible to user as cards on screen): ${foundSuppliers.join(', ')}
+You can reference these by name when the user asks about sourcing options.`)
+  }
+
+  const contextualMessages: ChatMessage[] = hiddenParts.length > 0
+    ? [{ role: 'assistant', content: `[${hiddenParts.join('\n\n')}]` }, ...messages]
     : messages
 
   const res = await fetch(`${API_URL}/api/chat`, {

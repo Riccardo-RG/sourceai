@@ -18,19 +18,6 @@ import { SourcingLink, SearchContext, RealSupplier } from '@/types'
 
 type Step = 'idle' | 'validating' | 'sourcing' | 'done' | 'error' | 'rate_limited'
 
-const POSITIONING_LABELS: Record<string, string> = {
-  mass_market: 'Mass market',
-  artisanal: 'Artigianale',
-  premium: 'Premium',
-  dropshipping: 'Dropshipping',
-  unknown: '—',
-}
-
-const CHANNEL_LABELS: Record<string, string> = {
-  online: 'Online',
-  store: 'Negozio fisico',
-  dropshipping: 'Dropshipping',
-}
 
 export default function Home() {
   const t = useT()
@@ -167,11 +154,11 @@ export default function Home() {
                   <span className="text-[10px] font-semibold tracking-widest text-muted-foreground/60 uppercase shrink-0">
                     {t.miriam_context_label}
                   </span>
-                  <ContextPill label={t.miriam_positioning} value={POSITIONING_LABELS[context.positioning] ?? context.positioning} />
+                  <ContextPill label={t.miriam_positioning} value={(t as unknown as Record<string, string>)[`pos_${context.positioning}`] ?? context.positioning} />
                   {context.market !== 'global' && (
                     <ContextPill label={t.miriam_market} value={context.market} />
                   )}
-                  <ContextPill label={t.miriam_channel} value={CHANNEL_LABELS[context.channel] ?? context.channel} />
+                  <ContextPill label={t.miriam_channel} value={(t as unknown as Record<string, string>)[`ch_${context.channel}`] ?? context.channel} />
                   <button
                     onClick={() => setMinimized(false)}
                     className="text-[10px] font-medium text-primary hover:underline shrink-0"
@@ -230,6 +217,7 @@ export default function Home() {
             <section className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
               <StepHeader number="02" label={t.step_02}
                 isLoading={step === 'sourcing'} loadingText={t.step_sourcing} />
+              {step === 'sourcing' && <SkeletonLinks />}
               {step === 'done' && (
                 <>
                   <SourcingLinks links={sourcingLinks} query={query} />
@@ -438,6 +426,22 @@ function ContextPill({ label, value }: { label: string; value: string }) {
       <span className="text-muted-foreground/50">{label}:</span>
       <span className="font-semibold text-foreground">{value}</span>
     </span>
+  )
+}
+
+function SkeletonLinks() {
+  return (
+    <div className="rounded-md border border-border overflow-hidden divide-y divide-border animate-pulse">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="flex items-center gap-3 px-4 py-3 bg-background">
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3 w-24 bg-muted rounded" />
+            <div className="h-2.5 w-48 bg-muted/60 rounded" />
+          </div>
+          <div className="h-2.5 w-4 bg-muted/40 rounded shrink-0" />
+        </div>
+      ))}
+    </div>
   )
 }
 
