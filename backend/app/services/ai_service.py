@@ -272,49 +272,72 @@ async def _tavily_search(api_key: str, query: str, max_results: int = 5) -> str:
         return f"[search unavailable: {e}]"
 
 
+def _detect_local_market(query: str, supplier_context: str) -> str | None:
+    """Extract a local country hint from query or supplier_context."""
+    text = (query + " " + supplier_context).lower()
+    if any(w in text for w in ("italia", "italian", "made in italy", "italiano")):
+        return "Italy"
+    if any(w in text for w in ("france", "french", "français", "Francia")):
+        return "France"
+    if any(w in text for w in ("spain", "spain", "españa", "Spanish")):
+        return "Spain"
+    if any(w in text for w in ("germany", "deutsch", "german", "Germania")):
+        return "Germany"
+    if any(w in text for w in ("uk", "britain", "british", "england")):
+        return "UK"
+    return None
+
+
 async def _search_real_suppliers(
     api_key: str,
     query: str,
     market: str,
     positioning: str,
+    supplier_context: str = "",
 ) -> tuple[list[dict], str]:
     """
-    Dual Tavily search: platform-specific + open web in parallel.
+    Dual Tavily search: platform directory + open web in parallel.
     Returns (structured_supplier_cards, raw_text_for_claude_prompt).
     """
     from tavily import AsyncTavilyClient
-    from urllib.parse import urlparse
 
     client = AsyncTavilyClient(api_key=api_key)
     market_upper = market.upper()
+    local_market = _detect_local_market(query, supplier_context)
 
-    # ── Platform-specific query (known B2B directories) ──────────────────────
+    # ── Platform-specific query ───────────────────────────────────────────────
+    # Europages is the best European B2B directory for small/local manufacturers.
+    # Faire/Ankorstore for non-European artisan brand discovery.
     if positioning == "artisanal":
-        if market_upper in ("EUROPE", "GB"):
-            platform_sq = f"site:ankorstore.com {query}"
+        if market_upper in ("EUROPE", "GB") or local_market:
+            loc = local_market or "Europe"
+            platform_sq = f"site:europages.co.uk {query} {loc} manufacturer"
         else:
-            platform_sq = f"site:faire.com {query}"
+            platform_sq = f"site:faire.com {query} brand"
     elif positioning == "premium":
-        if market_upper in ("EUROPE", "GB"):
-            platform_sq = f"site:europages.co.uk {query} manufacturer"
+        if market_upper in ("EUROPE", "GB") or local_market:
+            loc = local_market or "Europe"
+            platform_sq = f"site:europages.co.uk {query} {loc} manufacturer"
         else:
             platform_sq = f"site:alibaba.com {query} verified supplier"
     elif positioning == "dropshipping":
-        platform_sq = f"site:spocket.co {query}"
+        platform_sq = f"site:spocket.co {query} supplier"
     elif market_upper == "LATAM":
         platform_sq = f"site:made-in-china.com {query} manufacturer"
     else:
         platform_sq = f"site:alibaba.com {query} supplier manufacturer"
 
-    # ── Open web query (finds suppliers with their own websites) ─────────────
+    # ── Open web query ───────────────────────────────────────────────────────
+    # Use local market name when detected, otherwise fall back to market config.
     market_conf = MARKET_CONFIG.get(market_upper, MARKET_CONFIG["GLOBAL"])
-    market_name = market_conf.get("name", market)
+    geo = local_market or market_conf.get("name", market)
+    ctx_hint = f" {supplier_context}" if supplier_context else ""
     if positioning in ("artisanal", "premium"):
-        web_sq = f"{query} fornitore produttore artigianale B2B {market_name}"
+        web_sq = f"{query} produttore fornitore artigianale ingrosso {geo}{ctx_hint}"
     elif positioning == "dropshipping":
-        web_sq = f"{query} dropshipping supplier wholesale {market_name}"
+        web_sq = f"{query} dropshipping supplier wholesale {geo}"
     else:
-        web_sq = f"{query} supplier wholesale manufacturer B2B {market_name}"
+        web_sq = f"{query} supplier wholesale manufacturer B2B {geo}"
 
     # ── Run both searches in parallel ────────────────────────────────────────
     try:
@@ -444,7 +467,7 @@ async def _run_ai(
                 settings.tavily_api_key,
                 f"{query} ecommerce market {market_name} demand trend 2024 2025",
             ),
-            _search_real_suppliers(settings.tavily_api_key, query, market, positioning),
+            _search_real_suppliers(settings.tavily_api_key, query, market, positioning, supplier_ctx),
         ]
         results = await asyncio.gather(*tasks)
         trends_data = results[0]
