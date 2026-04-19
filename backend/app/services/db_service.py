@@ -171,7 +171,7 @@ def save_search_cache(
                 "viability":        viability,
                 "supplier_ids":     supplier_ids,
                 "created_at":       now.isoformat(),
-                "expires_at":       (now + timedelta(hours=24)).isoformat(),
+                "expires_at":       (now + timedelta(hours=72)).isoformat(),
             },
             on_conflict="query_normalized",
         ).execute()

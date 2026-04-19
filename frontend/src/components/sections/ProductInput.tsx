@@ -7,6 +7,7 @@ import { useT } from '@/hooks/useT'
 const MARKETS = [
   { code: 'GLOBAL',        flag: '🌍', label: 'Global'         },
   { code: 'EUROPE',        flag: '🇪🇺', label: 'Europe'         },
+  { code: 'GB',            flag: '🇬🇧', label: 'United Kingdom' },
   { code: 'NORTH_AMERICA', flag: '🌎', label: 'North America'  },
   { code: 'LATAM',         flag: '🌎', label: 'Latin America'  },
   { code: 'ASIA_PACIFIC',  flag: '🌏', label: 'Asia Pacific'   },

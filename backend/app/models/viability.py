@@ -16,3 +16,7 @@ class ViabilityScore(BaseModel):
     recommended_channels: list[str]
     trend_yoy: float
     verdict: str
+    # Google Trends fields (added after Claude response, optional)
+    trends_interest: int | None = None
+    trends_peak: str | None = None
+    trends_market: str | None = None

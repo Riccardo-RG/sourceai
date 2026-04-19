@@ -53,6 +53,7 @@ export async function searchProduct(
 ): Promise<{
   viability: object
   sourcing_links: Array<{ platform: string; url: string; label: string; description: string }>
+  real_suppliers: Array<{ name: string; platform: string; url: string; description: string }>
 }> {
   const userId = await getUserId()
   const res = await fetch(`${API_URL}/api/search`, {
@@ -69,12 +70,51 @@ export async function searchProduct(
 export async function* streamMiriam(
   messages: ChatMessage[],
   userMessage: string,
+  foundSuppliers: string[] = [],
+  searchContext?: import('@/types').SearchContext | null,
+  viabilitySummary?: string | null,
 ): AsyncGenerator<{ text?: string; signal?: string; done?: boolean }> {
   const headers = await authHeaders()
+
+  // Build hidden context notes injected at the start of history
+  const hiddenNotes: ChatMessage[] = []
+
+  if (searchContext) {
+    hiddenNotes.push({
+      role: 'assistant',
+      content: `[Confirmed search context from this session — do NOT ask about these again:
+- Product searched: "${searchContext.refined_query}"
+- Positioning: ${searchContext.positioning}
+- Market: ${searchContext.market.toUpperCase()}
+- Sales channel: ${searchContext.channel}
+- Target customer: ${searchContext.target_customer}
+- Supplier preference: ${searchContext.supplier_context}
+The search has been executed. The user can see results on screen.]`,
+    })
+  }
+
+  if (foundSuppliers.length > 0) {
+    hiddenNotes.push({
+      role: 'assistant',
+      content: `[Real suppliers found for this search: ${foundSuppliers.join(', ')}. The user sees their cards in the results section.]`,
+    })
+  }
+
+  if (viabilitySummary) {
+    hiddenNotes.push({
+      role: 'assistant',
+      content: `[Search results summary: ${viabilitySummary}]`,
+    })
+  }
+
+  const contextualMessages: ChatMessage[] = hiddenNotes.length > 0
+    ? [...hiddenNotes, ...messages]
+    : messages
+
   const res = await fetch(`${API_URL}/api/chat`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ messages, user_message: userMessage }),
+    body: JSON.stringify({ messages: contextualMessages, user_message: userMessage }),
   })
   if (!res.ok || !res.body) throw new Error(`Chat failed: ${res.status}`)
 

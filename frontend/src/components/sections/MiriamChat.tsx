@@ -54,7 +54,7 @@ function buildAdviceMessage(query: string, viability: Record<string, unknown>): 
 export default function MiriamChat({ onSearch }: Props) {
   const t = useT()
   const {
-    messages, minimized, height, isStreaming, pendingAdvice,
+    messages, minimized, height, isStreaming, pendingAdvice, foundSuppliers, context, viabilitySummary,
     addMessage, setContext, setMinimized, setHeight,
     setIsStreaming, clearPendingAdvice, reset,
   } = useMiriamStore()
@@ -148,7 +148,7 @@ export default function MiriamChat({ onSearch }: Props) {
     let signalAccumulated = ''
 
     try {
-      for await (const chunk of streamMiriam(messages, userMsg)) {
+      for await (const chunk of streamMiriam(messages, userMsg, foundSuppliers, context, viabilitySummary)) {
         if (chunk.done) break
         if (chunk.text) { accumulated += chunk.text; setStreamingText(accumulated) }
         if (chunk.signal) { signalAccumulated += chunk.signal }
@@ -195,7 +195,7 @@ export default function MiriamChat({ onSearch }: Props) {
   return (
     <div
       style={{ height: panelHeight }}
-      className="fixed bottom-0 right-4 z-50 w-80 flex flex-col rounded-t-xl border border-border bg-background shadow-2xl overflow-hidden"
+      className="fixed bottom-0 right-0 sm:right-4 z-50 w-full sm:w-80 flex flex-col rounded-t-xl border border-border bg-background shadow-2xl overflow-hidden"
     >
       {/* Drag handle */}
       {!minimized && (

@@ -40,7 +40,19 @@ export default function OutreachTracker() {
     return t.ot_days_ago.replace('{n}', String(days))
   }
 
-  if (entries.length === 0) return null
+  if (entries.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-border bg-card shadow-card p-8 text-center space-y-3">
+        <p className="text-2xl">📬</p>
+        <div className="space-y-1">
+          <p className="text-base font-semibold text-foreground">{t.ot_title}</p>
+          <p className="text-base text-muted-foreground max-w-xs mx-auto">
+            Trova un fornitore nella sezione Supplier trovati e clicca <span className="font-medium text-foreground">+ Outreach</span> per iniziare a tracciare i contatti.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="rounded-2xl border bg-card shadow-card overflow-hidden">

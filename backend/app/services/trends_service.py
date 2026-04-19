@@ -18,7 +18,7 @@ DATAFORSEO_URL = "https://api.dataforseo.com/v3/keywords_data/google_trends/expl
 MARKET_CONFIG: dict[str, dict] = {
     # ── Macro-markets ─────────────────────────────────────────────────────────
     "GLOBAL":        {"location_code": None, "language_code": "en", "name": "Global",           "amazon_tld": "com",     "currency": "USD"},
-    "EUROPE":        {"location_code": 2276, "language_code": "en", "name": "Europe",            "amazon_tld": "co.uk",   "currency": "EUR"},
+    "EUROPE":        {"location_code": 2276, "language_code": "en", "name": "Europe",            "amazon_tld": "de",      "currency": "EUR"},
     "NORTH_AMERICA": {"location_code": 2840, "language_code": "en", "name": "North America",     "amazon_tld": "com",     "currency": "USD"},
     "LATAM":         {"location_code": 2484, "language_code": "es", "name": "Latin America",     "amazon_tld": "com.mx",  "currency": "USD"},
     "ASIA_PACIFIC":  {"location_code": 2392, "language_code": "en", "name": "Asia Pacific",      "amazon_tld": "co.jp",   "currency": "USD"},

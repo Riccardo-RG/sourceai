@@ -68,7 +68,7 @@ function MetricCard({ label, tooltip, abs, pct, showBar = false }: {
 
 export default function MarginCalculator() {
   const t = useT()
-  const { inputs, result, selectedPlatform, setInput, setPlatform, saveScenario, scenarios, loadScenario, deleteScenario, hydrateScenarios, resetScenarios } = useMarginStore()
+  const { inputs, result, selectedPlatform, prefillNote, setInput, setPlatform, saveScenario, scenarios, loadScenario, deleteScenario, hydrateScenarios, resetScenarios } = useMarginStore()
   const { user, initialized } = useAuthStore()
   const [scenarioName, setScenarioName] = useState('')
   const [showSave, setShowSave] = useState(false)
@@ -135,8 +135,15 @@ export default function MarginCalculator() {
 
                 {/* Inputs */}
                 <div className="grid grid-cols-2 gap-5">
-                  <NumberInput label={t.mc_selling_price} tooltip={t.mc_selling_price_tooltip}
-                    value={inputs.selling_price} onChange={f('selling_price')} prefix="€" step={0.5} min={0.01} />
+                  <div className="space-y-1.5">
+                    <NumberInput label={t.mc_selling_price} tooltip={t.mc_selling_price_tooltip}
+                      value={inputs.selling_price} onChange={f('selling_price')} prefix="€" step={0.5} min={0.01} />
+                    {prefillNote && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                        <span>🟡</span> {prefillNote}
+                      </p>
+                    )}
+                  </div>
                   <NumberInput label={t.mc_unit_cost} tooltip={t.mc_unit_cost_tooltip}
                     value={inputs.unit_cost} onChange={f('unit_cost')} prefix="€" step={0.1} min={0.01} />
                   <NumberInput label={t.mc_shipping} tooltip={t.mc_shipping_tooltip}

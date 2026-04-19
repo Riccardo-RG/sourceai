@@ -9,6 +9,7 @@ from app.services.db_service import (
     get_cached_search,
     save_search_cache,
     log_search,
+    upsert_suppliers,
 )
 from app.services.trends_service import MARKET_CONFIG
 
@@ -271,10 +272,114 @@ async def _tavily_search(api_key: str, query: str, max_results: int = 5) -> str:
         return f"[search unavailable: {e}]"
 
 
+async def _search_real_suppliers(
+    api_key: str,
+    query: str,
+    market: str,
+    positioning: str,
+) -> tuple[list[dict], str]:
+    """
+    Single targeted Tavily search on the most relevant B2B platform.
+    Returns (structured_supplier_cards, raw_text_for_claude_prompt).
+    One Tavily call instead of two — merged with the general supplier search.
+    """
+    from tavily import AsyncTavilyClient
+    from urllib.parse import urlparse
+
+    client = AsyncTavilyClient(api_key=api_key)
+    market_upper = market.upper()
+
+    # Pick the single most relevant B2B source for this context
+    if positioning in ("artisanal", "premium") or market_upper in ("EUROPE", "GB"):
+        sq = f"site:europages.com {query} manufacturer supplier"
+    elif market_upper == "LATAM":
+        sq = f"site:made-in-china.com {query} manufacturer"
+    else:
+        sq = f"site:alibaba.com {query} supplier manufacturer"
+
+    raw_results: list[dict] = []
+    try:
+        r = await client.search(sq, max_results=5, search_depth="basic")
+        raw_results = r.get("results", [])
+    except Exception:
+        return [], "[supplier data unavailable]"
+
+    # Build plain text for Claude's supplier context
+    supplier_text = "\n".join(
+        f"- {r.get('title', '')}: {r.get('content', '')[:300]}"
+        for r in raw_results[:4]
+    ) or "[no supplier data found]"
+
+    def _platform_from_url(url: str) -> str:
+        if "europages" in url:     return "Europages"
+        if "alibaba.com" in url:   return "Alibaba"
+        if "made-in-china" in url: return "Made-in-China"
+        if "ankorstore" in url:    return "Ankorstore"
+        if "faire.com" in url:     return "Faire"
+        return "Web"
+
+    def _clean_name(title: str, platform: str) -> str:
+        for suffix in [
+            f" - {platform}", f" | {platform}", f" - {platform}.com",
+            " - Europages", "| Europages", " - Alibaba.com", "- Alibaba",
+            " | Alibaba", " - Made-in-China.com",
+        ]:
+            title = title.replace(suffix, "")
+        for sep in [" - ", " | ", " — "]:
+            if sep in title:
+                title = title.split(sep)[0]
+        return title.strip()[:80]
+
+    skip_patterns = [
+        "/search?", "/wholesale?", "SearchText=", "/trade/search",
+        "/en/products/", "/catalog/", "page=", "?q=",
+        "/product-detail/", "/product/", "?keyword=", "/offers-for-sale",
+        "/multi-search/", "showroom", "/p-detail", "offerList",
+    ]
+
+    suppliers: list[dict] = []
+    seen_netloc: set[str] = set()
+
+    for r in raw_results:
+        url = r.get("url", "")
+        title = r.get("title", "")
+        content = r.get("content", "")
+
+        if not url or not title:
+            continue
+        if any(p in url for p in skip_patterns):
+            continue
+
+        netloc = urlparse(url).netloc
+        if netloc in seen_netloc:
+            continue
+        seen_netloc.add(netloc)
+
+        platform = _platform_from_url(url)
+        name = _clean_name(title, platform)
+        if not name:
+            continue
+
+        suppliers.append({
+            "name": name,
+            "platform": platform,
+            "url": url,
+            "description": content[:220].strip() if content else "",
+            "source": platform,
+            "verified": False,
+            "ai_score": 3.0,
+        })
+
+        if len(suppliers) >= 5:
+            break
+
+    return suppliers, supplier_text
+
+
 async def _run_ai(
     query: str,
     category: str | None,
-    market: str = "US",
+    market: str = "GLOBAL",
     context: dict | None = None,
 ) -> dict:
     from app.services.trends_service import get_trends_data
@@ -294,17 +399,10 @@ async def _run_ai(
     supplier_text = "[data unavailable]"
     trends_data = None
 
-    # Build context-aware supplier search query
-    if positioning == "artisanal":
-        supplier_query = f"{query} European artisan manufacturer wholesale supplier"
-    elif positioning == "premium":
-        supplier_query = f"{query} premium manufacturer OEM private label wholesale"
-    elif positioning == "dropshipping":
-        supplier_query = f"{query} dropshipping supplier aliexpress spocket no MOQ"
-    else:
-        supplier_query = f"{query} wholesale supplier alibaba aliexpress price"
-
+    # 3 Tavily calls total (down from 5):
+    #   1. Amazon prices  2. Market trends  3. B2B supplier search (merged with real supplier cards)
     tasks = [get_trends_data(query, market)]
+    real_suppliers: list[dict] = []
     if settings.tavily_api_key:
         tasks += [
             _tavily_search(
@@ -316,14 +414,13 @@ async def _run_ai(
                 settings.tavily_api_key,
                 f"{query} ecommerce market {market_name} demand trend 2024 2025",
             ),
-            _tavily_search(
-                settings.tavily_api_key,
-                supplier_query,
-            ),
+            _search_real_suppliers(settings.tavily_api_key, query, market, positioning),
         ]
         results = await asyncio.gather(*tasks)
         trends_data = results[0]
-        amazon_text, market_text, supplier_text = results[1], results[2], results[3]
+        amazon_text, market_text = results[1], results[2]
+        if len(results) > 3:
+            real_suppliers, supplier_text = results[3]
     else:
         trends_data = await get_trends_data(query, market)
 
@@ -381,6 +478,17 @@ async def _run_ai(
         data["viability"]["trends_peak"] = trends_data["peak_month"]
         data["viability"]["trends_market"] = trends_data["market_name"]
 
+    data["real_suppliers"] = real_suppliers
+
+    # Persist real suppliers to DB and capture IDs for cache linking
+    supplier_ids: list[str] = []
+    if real_suppliers:
+        try:
+            supplier_ids = await asyncio.to_thread(upsert_suppliers, real_suppliers)
+        except Exception:
+            pass
+    data["_supplier_ids"] = supplier_ids
+
     return data
 
 
@@ -399,6 +507,18 @@ async def analyze_product(
     if cached:
         asyncio.ensure_future(asyncio.to_thread(log_search, query, category, session_id, True))
         cached["sourcing_links"] = _build_sourcing_links(query, market, positioning)
+        # Rebuild real_suppliers from cached supplier DB rows
+        db_suppliers = cached.get("suppliers", [])
+        cached["real_suppliers"] = [
+            {
+                "name": s.get("name", ""),
+                "platform": s.get("source", ""),
+                "url": s.get("url", ""),
+                "description": s.get("description", ""),
+            }
+            for s in db_suppliers
+            if s.get("name") and s.get("url")
+        ]
         return cached
 
     # ── 2. AI pipeline ────────────────────────────────────────────────────────
@@ -412,11 +532,13 @@ async def analyze_product(
             logging.getLogger(__name__).error("AI pipeline failed: %s", e)
             data = _mock_response(query, market, positioning)
 
+    supplier_ids = data.pop("_supplier_ids", [])
+
     # ── 3. Persist ────────────────────────────────────────────────────────────
     try:
         await asyncio.gather(
             asyncio.to_thread(
-                save_search_cache, normalized, category, data["viability"], []
+                save_search_cache, normalized, category, data["viability"], supplier_ids
             ),
             asyncio.to_thread(log_search, query, category, session_id, False),
         )

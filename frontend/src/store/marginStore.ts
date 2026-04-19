@@ -57,9 +57,11 @@ interface MarginStore {
   scenarios: MarginScenario[]
   selectedPlatform: string
   scenariosHydrated: boolean
+  prefillNote: string | null
 
   setInput: (key: keyof MarginInputs, value: number) => void
   setPlatform: (platform: string) => void
+  setPrefillNote: (note: string | null) => void
   hydrateScenarios: () => Promise<void>
   resetScenarios: () => void
   saveScenario: (name: string, supplierName?: string) => Promise<void>
@@ -73,11 +75,17 @@ export const useMarginStore = create<MarginStore>((set, get) => ({
   scenarios: [],
   selectedPlatform: 'Shopify',
   scenariosHydrated: false,
+  prefillNote: null,
 
   setInput: (key, value) => {
     const newInputs = { ...get().inputs, [key]: value }
-    set({ inputs: newInputs, result: computeMargins(newInputs) })
+    // Clear prefill note when user manually edits selling price
+    const update: Partial<MarginStore> = { inputs: newInputs, result: computeMargins(newInputs) }
+    if (key === 'selling_price') update.prefillNote = null
+    set(update)
   },
+
+  setPrefillNote: (note) => set({ prefillNote: note }),
 
   setPlatform: (platform) => {
     const fee = PLATFORM_FEES[platform] ?? 0

@@ -39,6 +39,13 @@ export interface SupplierCard {
   description: string
 }
 
+export interface RealSupplier {
+  name: string
+  platform: string
+  url: string
+  description: string
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string

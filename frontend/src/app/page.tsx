@@ -1,19 +1,21 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Navbar from '@/components/Navbar'
 import ProductInput from '@/components/sections/ProductInput'
 import MarginCalculator from '@/components/sections/MarginCalculator'
 import SourcingLinks from '@/components/sections/SourcingLinks'
+import RealSuppliers from '@/components/sections/RealSuppliers'
 import OutreachTracker from '@/components/sections/OutreachTracker'
 import MiriamChat from '@/components/sections/MiriamChat'
 import SavedSuppliers from '@/components/sections/SavedSuppliers'
 import { searchProduct } from '@/lib/api'
 import { useT } from '@/hooks/useT'
 import { useMiriamStore } from '@/store/miriamStore'
-import { SourcingLink, SearchContext } from '@/types'
+import { useMarginStore } from '@/store/marginStore'
+import { SourcingLink, SearchContext, RealSupplier } from '@/types'
 
-type Step = 'idle' | 'validating' | 'sourcing' | 'done' | 'error'
+type Step = 'idle' | 'validating' | 'sourcing' | 'done' | 'error' | 'rate_limited'
 
 const POSITIONING_LABELS: Record<string, string> = {
   mass_market: 'Mass market',
@@ -33,13 +35,17 @@ export default function Home() {
   const t = useT()
   const [step, setStep] = useState<Step>('idle')
   const [query, setQuery] = useState('')
+  const [currentMarket, setCurrentMarket] = useState('GLOBAL')
   const [viabilityData, setViabilityData] = useState<Record<string, unknown> | null>(null)
   const [sourcingLinks, setSourcingLinks] = useState<SourcingLink[]>([])
+  const [realSuppliers, setRealSuppliers] = useState<RealSupplier[]>([])
 
-  const { context, triggerAdvice, isStreaming, setMinimized } = useMiriamStore()
+  const { context, triggerAdvice, isStreaming, setMinimized, setFoundSuppliers, setViabilitySummary } = useMiriamStore()
+  const { setInput: setMarginInput, setPrefillNote } = useMarginStore()
 
   const handleSearch = async (q: string, category?: string, market = 'GLOBAL', ctx?: SearchContext) => {
     setQuery(q)
+    setCurrentMarket(market)
     setStep('validating')
 
     const timer = setTimeout(
@@ -51,15 +57,49 @@ export default function Home() {
       const data = await searchProduct(q, category, market, ctx ?? undefined)
       setViabilityData(data.viability as Record<string, unknown>)
       setSourcingLinks(data.sourcing_links)
+      const rs = data.real_suppliers ?? []
+      setRealSuppliers(rs)
+      setFoundSuppliers(rs.map((s) => s.name))
+
+      // Build a compact viability summary for Miriam's context
+      const vib = data.viability as Record<string, unknown>
+      const summaryParts: string[] = []
+      if (typeof vib.demand === 'number') summaryParts.push(`demand ${vib.demand}/100`)
+      if (typeof vib.competition === 'number') summaryParts.push(`competition ${vib.competition}/100`)
+      if (typeof vib.margin_potential === 'number') summaryParts.push(`margin potential ${vib.margin_potential}/100`)
+      if (typeof vib.price_range_min === 'number' && vib.price_range_min > 0) {
+        summaryParts.push(`Amazon price range ${vib.price_range_min}–${vib.price_range_max}`)
+      }
+      if (typeof vib.trends_interest === 'number') summaryParts.push(`Google Trends interest ${vib.trends_interest}/100`)
+      if (typeof vib.verdict === 'string') summaryParts.push(`verdict: "${vib.verdict}"`)
+      setViabilitySummary(summaryParts.length > 0 ? summaryParts.join(', ') : null)
+
+      // Pre-fill margin calculator with Amazon price range if available
+      const v = data.viability as Record<string, unknown>
+      const priceMin = typeof v?.price_range_min === 'number' ? v.price_range_min : 0
+      const priceMax = typeof v?.price_range_max === 'number' ? v.price_range_max : 0
+      if (priceMin > 0 || priceMax > 0) {
+        const avg = priceMin > 0 && priceMax > 0
+          ? (priceMin + priceMax) / 2
+          : priceMin || priceMax
+        const rounded = Math.round(avg * 100) / 100
+        setMarginInput('selling_price', rounded)
+        setPrefillNote(`Pre-compilato dai prezzi Amazon (${priceMin > 0 ? priceMin.toFixed(0) : '?'}–${priceMax > 0 ? priceMax.toFixed(0) : '?'})`)
+      }
+
       setStep('done')
-    } catch {
-      setStep('error')
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('429')) {
+        setStep('rate_limited')
+      } else {
+        setStep('error')
+      }
     } finally {
       clearTimeout(timer)
     }
   }
 
-  const [verdictOpen, setVerdictOpen] = useState(false)
+  const [verdictOpen, setVerdictOpen] = useState(true)
 
   const handleAdviceCta = useCallback(() => {
     if (!viabilityData) return
@@ -67,6 +107,7 @@ export default function Home() {
   }, [viabilityData, query, triggerAdvice])
 
   const isLoading = step === 'validating' || step === 'sourcing'
+  const isRateLimited = step === 'rate_limited'
 
   return (
     <>
@@ -101,6 +142,17 @@ export default function Home() {
           {step === 'error' && (
             <div className="rounded-2xl border border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900 px-6 py-5 text-base text-red-700 dark:text-red-400">
               {t.step_error}
+            </div>
+          )}
+
+          {/* Rate limit */}
+          {isRateLimited && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900 px-6 py-5 flex items-start gap-3">
+              <span className="text-xl shrink-0">⏱️</span>
+              <div>
+                <p className="text-base font-semibold text-amber-800 dark:text-amber-300">Troppe ricerche in poco tempo</p>
+                <p className="text-sm text-amber-700 dark:text-amber-400 mt-0.5">Attendi qualche secondo prima di lanciare una nuova ricerca.</p>
+              </div>
             </div>
           )}
 
@@ -144,16 +196,19 @@ export default function Home() {
           )}
 
           {/* Step 01 */}
-          {step !== 'idle' && step !== 'error' && (
+          {step !== 'idle' && step !== 'error' && step !== 'rate_limited' && (
             <section className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
               <StepHeader number="01" label={t.step_01}
                 isLoading={step === 'validating'} loadingText={t.step_loading.replace('{query}', query)} />
+              {step === 'validating' && <LoadingSteps />}
               {step !== 'validating' && viabilityData && (
                 <>
-                  {/* ViabilityScore commentato — score numerico da ridisegnare (basato su recensioni supplier) */}
-                  {/* <ViabilityScore data={viabilityData} query={query} /> */}
+                  <ScoresRow data={viabilityData} />
 
-                  <TrendsCard data={viabilityData} />
+                  <div className="flex flex-wrap gap-2">
+                    <TrendsCard data={viabilityData} />
+                    <PriceRangeCard data={viabilityData} />
+                  </div>
 
                   <div className="flex flex-col gap-3">
                     {/* Miriam advice CTA */}
@@ -182,7 +237,12 @@ export default function Home() {
             <section className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
               <StepHeader number="02" label={t.step_02}
                 isLoading={step === 'sourcing'} loadingText={t.step_sourcing} />
-              {step === 'done' && <SourcingLinks links={sourcingLinks} query={query} />}
+              {step === 'done' && (
+                <>
+                  <SourcingLinks links={sourcingLinks} query={query} />
+                  <RealSuppliers suppliers={realSuppliers} query={query} market={currentMarket} />
+                </>
+              )}
             </section>
           )}
 
@@ -211,7 +271,7 @@ export default function Home() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {t.how_steps.map((s, i) => (
                   <div key={i} className="p-6 rounded-2xl border bg-card shadow-card space-y-3">
-                    <span className="text-sm font-mono font-bold text-muted-foreground/40">
+                    <span className="text-sm tabular-nums font-bold text-muted-foreground/40">
                       {String(i + 1).padStart(2, '0')}
                     </span>
                     <div className="space-y-1.5">
@@ -233,6 +293,77 @@ export default function Home() {
       {/* Saved suppliers panel — fixed bottom-left, hidden when empty */}
       <SavedSuppliers />
     </>
+  )
+}
+
+const LOADING_STEPS = [
+  'Ricerca prezzi su Amazon...',
+  'Analisi trend di mercato...',
+  'Ricerca supplier B2B...',
+  'Analisi con AI in corso...',
+  'Quasi pronto...',
+]
+
+function LoadingSteps() {
+  const [idx, setIdx] = useState(0)
+
+  useEffect(() => {
+    const id = setInterval(() => setIdx((i) => Math.min(i + 1, LOADING_STEPS.length - 1)), 4000)
+    return () => clearInterval(id)
+  }, [])
+
+  return (
+    <div className="flex items-center gap-2 text-sm text-muted-foreground animate-in fade-in duration-300">
+      <svg className="animate-spin h-3.5 w-3.5 shrink-0 text-primary/60" viewBox="0 0 24 24" fill="none">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+      </svg>
+      <span key={idx} className="animate-in fade-in duration-500">{LOADING_STEPS[idx]}</span>
+    </div>
+  )
+}
+
+function ScoresRow({ data }: { data: Record<string, unknown> | null }) {
+  if (!data) return null
+  const scores = [
+    { label: 'Domanda', key: 'demand', invert: false },
+    { label: 'Concorrenza', key: 'competition', invert: true },
+    { label: 'Margine', key: 'margin_potential', invert: false },
+    { label: 'Sourcing', key: 'sourcing_ease', invert: false },
+  ] as const
+
+  const hasAny = scores.some(s => typeof data[s.key] === 'number')
+  if (!hasAny) return null
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {scores.map(({ label, key, invert }) => {
+        const raw = typeof data[key] === 'number' ? (data[key] as number) : null
+        if (raw === null) return null
+        // For competition: high score = easy market = good (green)
+        // invert=true means high raw value = bad (saturated)
+        const goodVal = invert ? 100 - raw : raw
+        const color = goodVal >= 65
+          ? 'text-emerald-600 dark:text-emerald-400'
+          : goodVal >= 40
+            ? 'text-amber-600 dark:text-amber-400'
+            : 'text-red-500 dark:text-red-400'
+        const barColor = goodVal >= 65
+          ? 'bg-emerald-500'
+          : goodVal >= 40
+            ? 'bg-amber-400'
+            : 'bg-red-400'
+        return (
+          <div key={key} className="p-3 rounded-xl border border-border bg-card space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
+            <p className={`text-2xl font-bold tabular-nums ${color}`}>{raw}<span className="text-sm font-normal text-muted-foreground">/100</span></p>
+            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+              <div className={`h-full rounded-full ${barColor}`} style={{ width: `${raw}%` }} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
@@ -266,6 +397,28 @@ function TrendsCard({ data }: { data: Record<string, unknown> | null }) {
       {peak && (
         <span className="text-xs text-muted-foreground/70">Peak: {peak}</span>
       )}
+    </div>
+  )
+}
+
+function PriceRangeCard({ data }: { data: Record<string, unknown> | null }) {
+  const priceMin = typeof data?.price_range_min === 'number' ? data.price_range_min : 0
+  const priceMax = typeof data?.price_range_max === 'number' ? data.price_range_max : 0
+  if (priceMin === 0 && priceMax === 0) return null
+
+  const tld = typeof data?.trends_market === 'string' ? `Amazon ${data.trends_market}` : 'Amazon'
+  return (
+    <div className="flex items-center gap-3 flex-wrap px-4 py-3 rounded-xl border border-border bg-muted/30 w-fit">
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 px-2 py-0.5 rounded-full">
+        🟡 {tld}
+      </span>
+      <span className="text-sm text-muted-foreground">
+        Prezzi rilevati:{' '}
+        <span className="font-semibold text-foreground">
+          {priceMin > 0 ? `${priceMin.toFixed(0)}` : '?'}
+          {priceMax > 0 && priceMax !== priceMin ? ` – ${priceMax.toFixed(0)}` : ''}
+        </span>
+      </span>
     </div>
   )
 }
@@ -309,7 +462,7 @@ function StepHeader({ number, label, isLoading = false, loadingText = '' }: {
 }) {
   return (
     <div className="flex items-center gap-4">
-      <span className="text-sm font-mono font-bold text-muted-foreground/35 shrink-0">{number}</span>
+      <span className="text-sm tabular-nums font-bold text-muted-foreground/35 shrink-0">{number}</span>
       <div className="h-px flex-1 bg-border" />
       <h2 className="text-base font-semibold tracking-widest uppercase text-muted-foreground shrink-0">{label}</h2>
       {isLoading && (
