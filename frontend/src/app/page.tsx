@@ -5,7 +5,6 @@ import Navbar from '@/components/Navbar'
 import ProductInput from '@/components/sections/ProductInput'
 import MarginCalculator from '@/components/sections/MarginCalculator'
 import SourcingLinks from '@/components/sections/SourcingLinks'
-import ViabilityScore from '@/components/sections/ViabilityScore'
 import OutreachTracker from '@/components/sections/OutreachTracker'
 import MiriamChat from '@/components/sections/MiriamChat'
 import SavedSuppliers from '@/components/sections/SavedSuppliers'
@@ -39,7 +38,7 @@ export default function Home() {
 
   const { context, triggerAdvice, isStreaming, setMinimized } = useMiriamStore()
 
-  const handleSearch = async (q: string, category?: string, market = 'US', ctx?: SearchContext) => {
+  const handleSearch = async (q: string, category?: string, market = 'GLOBAL', ctx?: SearchContext) => {
     setQuery(q)
     setStep('validating')
 

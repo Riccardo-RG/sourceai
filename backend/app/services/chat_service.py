@@ -62,6 +62,7 @@ async def stream_miriam_response(
     buffer = ""
     signal_buffer = ""
     capturing_signal = False
+    active_closing_tag = ""
 
     async with client.messages.stream(
         model="claude-haiku-4-5-20251001",
@@ -72,14 +73,14 @@ async def stream_miriam_response(
         async for text in stream.text_stream:
             if capturing_signal:
                 signal_buffer += text
-                # Check if signal is complete
-                if ">" in signal_buffer:
-                    closing = signal_buffer.find(">")
-                    remaining = signal_buffer[closing + 1:]
-                    full_signal = signal_buffer[: closing + 1]
+                if active_closing_tag in signal_buffer:
+                    end_idx = signal_buffer.find(active_closing_tag) + len(active_closing_tag)
+                    full_signal = signal_buffer[:end_idx]
+                    remaining = signal_buffer[end_idx:]
                     yield "data: " + json.dumps({"signal": full_signal}) + "\n\n"
                     capturing_signal = False
                     signal_buffer = ""
+                    active_closing_tag = ""
                     if remaining.strip():
                         yield "data: " + json.dumps({"text": remaining}) + "\n\n"
             else:
@@ -105,6 +106,7 @@ async def stream_miriam_response(
                         signal_buffer = ""
                     else:
                         capturing_signal = True
+                        active_closing_tag = closing_tag
                 elif "<" in buffer:
                     # Might be start of a tag — hold the partial
                     last_lt = buffer.rfind("<")

@@ -74,7 +74,7 @@ export default function MiriamChat({ onSearch }: Props) {
         try {
           const ctx: SearchContext = JSON.parse(match[1])
           setContext(ctx)
-          const market = ctx.market === 'global' ? 'US' : ctx.market
+          const market = ctx.market.toUpperCase()
           onSearch(ctx.refined_query, undefined, market, ctx)
         } catch { /* malformed json */ }
       }

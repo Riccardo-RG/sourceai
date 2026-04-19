@@ -13,7 +13,7 @@ class SearchRequest(BaseModel):
     query: str
     category: str | None = None
     session_id: str = "anonymous"
-    market: str = "US"
+    market: str = "GLOBAL"
     context: dict | None = None  # Miriam chat context: positioning, channel, etc.
 
 

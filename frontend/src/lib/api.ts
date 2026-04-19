@@ -48,7 +48,7 @@ export async function getUserId(): Promise<string> {
 export async function searchProduct(
   query: string,
   category?: string,
-  market = 'US',
+  market = 'GLOBAL',
   context?: object,
 ): Promise<{
   viability: object
