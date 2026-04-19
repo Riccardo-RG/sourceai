@@ -178,6 +178,25 @@ export interface T {
   auth_reset_success: string
   auth_redirect: string
   auth_password_short: string
+
+  // Miriam chat
+  miriam_title: string
+  miriam_placeholder: string
+  miriam_send: string
+  miriam_typing: string
+  miriam_invalid_query: string
+  miriam_search_launching: string
+  miriam_welcome: string
+  miriam_advice_cta: string
+  miriam_advice_loading: string
+  miriam_context_label: string
+  miriam_positioning: string
+  miriam_market: string
+  miriam_channel: string
+  miriam_generic_hint: string      // shown when search was done without Miriam context
+  miriam_generic_cta: string       // "ask Miriam" link in the hint
+  miriam_context_hint: string      // shown when search WAS guided by Miriam (invite to refine)
+  miriam_context_refine: string    // "ask Miriam to refine" link
 }
 
 const en: T = {
@@ -357,6 +376,24 @@ const en: T = {
   auth_reset_success: 'Password updated!',
   auth_redirect: 'Redirecting…',
   auth_password_short: 'Minimum 6 characters',
+
+  miriam_title: 'Miriam · AI Research',
+  miriam_placeholder: 'Tell me what you want to sell…',
+  miriam_send: 'Send',
+  miriam_typing: 'Miriam is thinking…',
+  miriam_invalid_query: 'This doesn\'t look like a sellable product. Try being more specific.',
+  miriam_search_launching: 'Launching market research…',
+  miriam_welcome: 'Hi! I\'m Miriam, your sourcing assistant. Tell me what product you\'d like to sell, and I\'ll help you refine the search before we dig into the data. By default I\'ll look for global online opportunities (including dropshipping) — unless you tell me otherwise.',
+  miriam_advice_cta: 'Miriam\'s take on this →',
+  miriam_advice_loading: 'Miriam is analyzing the results…',
+  miriam_context_label: 'Search configured by Miriam',
+  miriam_positioning: 'Positioning',
+  miriam_market: 'Market',
+  miriam_channel: 'Channel',
+  miriam_generic_hint: 'Results based on default parameters (global online market). For a more targeted search by positioning, channel and market —',
+  miriam_generic_cta: 'ask Miriam',
+  miriam_context_hint: 'Suppliers filtered based on your search context. Want to change something?',
+  miriam_context_refine: 'Ask Miriam to refine',
 }
 
 const it: T = {
@@ -536,6 +573,24 @@ const it: T = {
   auth_reset_success: 'Password aggiornata!',
   auth_redirect: 'Reindirizzamento in corso…',
   auth_password_short: 'Minimo 6 caratteri',
+
+  miriam_title: 'Miriam · Ricerca AI',
+  miriam_placeholder: 'Dimmi cosa vuoi vendere…',
+  miriam_send: 'Invia',
+  miriam_typing: 'Miriam sta pensando…',
+  miriam_invalid_query: 'Questo non sembra un prodotto vendibile. Prova a essere più specifico.',
+  miriam_search_launching: 'Avvio ricerca di mercato…',
+  miriam_welcome: 'Ciao! Sono Miriam, la tua assistente al sourcing. Dimmi che prodotto vuoi vendere e ti aiuto a definire la ricerca prima di analizzare i dati. Di default cerco opportunità di vendita online a livello globale (incluso dropshipping) — a meno che tu non mi dica altro.',
+  miriam_advice_cta: 'Il parere di Miriam →',
+  miriam_advice_loading: 'Miriam sta analizzando i risultati…',
+  miriam_context_label: 'Ricerca configurata da Miriam',
+  miriam_positioning: 'Posizionamento',
+  miriam_market: 'Mercato',
+  miriam_channel: 'Canale',
+  miriam_generic_hint: 'Risultati basati su parametri standard (mercato online globale). Per una ricerca più mirata per posizionamento, canale e mercato —',
+  miriam_generic_cta: 'chiedi a Miriam',
+  miriam_context_hint: 'Fornitori filtrati in base al contesto della tua ricerca. Vuoi cambiare qualcosa?',
+  miriam_context_refine: 'Chiedi a Miriam di raffinare',
 }
 
 const es: T = {
@@ -715,6 +770,24 @@ const es: T = {
   auth_reset_success: '¡Contraseña actualizada!',
   auth_redirect: 'Redirigiendo…',
   auth_password_short: 'Mínimo 6 caracteres',
+
+  miriam_title: 'Miriam · Investigación AI',
+  miriam_placeholder: 'Dime qué quieres vender…',
+  miriam_send: 'Enviar',
+  miriam_typing: 'Miriam está pensando…',
+  miriam_invalid_query: 'Esto no parece un producto vendible. Intenta ser más específico.',
+  miriam_search_launching: 'Lanzando investigación de mercado…',
+  miriam_welcome: '¡Hola! Soy Miriam, tu asistente de sourcing. Cuéntame qué producto quieres vender y te ayudo a afinar la búsqueda antes de analizar los datos. Por defecto busco oportunidades de venta online a nivel global (incluyendo dropshipping) — a menos que me indiques lo contrario.',
+  miriam_advice_cta: 'La opinión de Miriam →',
+  miriam_advice_loading: 'Miriam está analizando los resultados…',
+  miriam_context_label: 'Búsqueda configurada por Miriam',
+  miriam_positioning: 'Posicionamiento',
+  miriam_market: 'Mercado',
+  miriam_channel: 'Canal',
+  miriam_generic_hint: 'Resultados basados en parámetros estándar (mercado online global). Para una búsqueda más precisa por posicionamiento, canal y mercado —',
+  miriam_generic_cta: 'pregunta a Miriam',
+  miriam_context_hint: 'Proveedores filtrados según el contexto de tu búsqueda. ¿Quieres cambiar algo?',
+  miriam_context_refine: 'Pide a Miriam que afine',
 }
 
 export const translations: Record<Lang, T> = { en, it, es }

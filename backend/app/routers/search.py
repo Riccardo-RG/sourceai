@@ -11,7 +11,7 @@ async def search(req: SearchRequest):
     if not req.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
     try:
-        data = await analyze_product(req.query.strip(), req.category, req.session_id, req.market)
+        data = await analyze_product(req.query.strip(), req.category, req.session_id, req.market, req.context)
         return SearchResponse(
             viability=ViabilityScore(**data["viability"]),
             sourcing_links=[SourcingLink(**l) for l in data["sourcing_links"]],

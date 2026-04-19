@@ -14,6 +14,7 @@ class SearchRequest(BaseModel):
     category: str | None = None
     session_id: str = "anonymous"
     market: str = "US"
+    context: dict | None = None  # Miriam chat context: positioning, channel, etc.
 
 
 class SearchResponse(BaseModel):

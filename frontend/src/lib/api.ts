@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase'
+import type { ChatMessage } from '@/types'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
@@ -44,7 +45,12 @@ export async function getUserId(): Promise<string> {
 
 // ── Search ───────────────────────────────────────────────────────────────────
 
-export async function searchProduct(query: string, category?: string, market = 'US'): Promise<{
+export async function searchProduct(
+  query: string,
+  category?: string,
+  market = 'US',
+  context?: object,
+): Promise<{
   viability: object
   sourcing_links: Array<{ platform: string; url: string; label: string; description: string }>
 }> {
@@ -52,10 +58,46 @@ export async function searchProduct(query: string, category?: string, market = '
   const res = await fetch(`${API_URL}/api/search`, {
     method: 'POST',
     headers: await authHeaders(),
-    body: JSON.stringify({ query, category, session_id: userId, market }),
+    body: JSON.stringify({ query, category, session_id: userId, market, context }),
   })
   if (!res.ok) throw new Error(`Search failed: ${res.status}`)
   return res.json()
+}
+
+// ── Miriam Chat (SSE streaming) ──────────────────────────────────────────────
+
+export async function* streamMiriam(
+  messages: ChatMessage[],
+  userMessage: string,
+): AsyncGenerator<{ text?: string; signal?: string; done?: boolean }> {
+  const headers = await authHeaders()
+  const res = await fetch(`${API_URL}/api/chat`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ messages, user_message: userMessage }),
+  })
+  if (!res.ok || !res.body) throw new Error(`Chat failed: ${res.status}`)
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop() ?? ''
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      const data = line.slice(6).trim()
+      if (data === '[DONE]') { yield { done: true }; return }
+      try {
+        yield JSON.parse(data)
+      } catch { /* ignore malformed */ }
+    }
+  }
+  yield { done: true }
 }
 
 // ── Outreach ─────────────────────────────────────────────────────────────────

@@ -67,37 +67,137 @@ Return EXACTLY this JSON (no other text):
 """
 
 
-def _build_sourcing_links(query: str, market: str = "US") -> list[dict]:
-    q = urllib.parse.quote_plus(query)
-    conf = MARKET_CONFIG.get(market.upper(), MARKET_CONFIG["US"])
-    amazon_tld = conf.get("amazon_tld")
-    market_name = conf.get("name", market)
-
-    links = [
+SUPPLIER_PLATFORMS = {
+    "dropshipping": [
+        {
+            "platform": "AliExpress",
+            "url": "https://www.aliexpress.com/wholesale?SearchText={q}",
+            "label": "Search on AliExpress",
+            "description": "Dropshipping with no minimum order",
+        },
+        {
+            "platform": "Spocket",
+            "url": "https://www.spocket.co/products?search={q}",
+            "label": "Search on Spocket",
+            "description": "EU/US suppliers for fast dropshipping",
+        },
+        {
+            "platform": "DHgate",
+            "url": "https://www.dhgate.com/wholesale/search.do?searchkey={q}",
+            "label": "Search on DHgate",
+            "description": "Small-batch wholesale, dropshipping-friendly",
+        },
+    ],
+    "artisanal": [
+        {
+            "platform": "Europages",
+            "url": "https://www.europages.co.uk/companies/{q}.html",
+            "label": "Search on Europages",
+            "description": "European manufacturers and artisans",
+        },
+        {
+            "platform": "Ankorstore",
+            "url": "https://www.ankorstore.com/search?query={q}",
+            "label": "Search on Ankorstore",
+            "description": "European artisan brands, low MOQ",
+        },
+        {
+            "platform": "Faire",
+            "url": "https://www.faire.com/search?q={q}",
+            "label": "Search on Faire",
+            "description": "Independent artisan brands, net-60 payment",
+        },
+    ],
+    "premium": [
+        {
+            "platform": "Europages",
+            "url": "https://www.europages.co.uk/companies/{q}.html",
+            "label": "Search on Europages",
+            "description": "Quality European manufacturers",
+        },
         {
             "platform": "Alibaba",
-            "url": f"https://www.alibaba.com/trade/search?SearchText={q}",
+            "url": "https://www.alibaba.com/trade/search?SearchText={q}",
+            "label": "Search on Alibaba",
+            "description": "Verified manufacturers with custom branding",
+        },
+        {
+            "platform": "Ankorstore",
+            "url": "https://www.ankorstore.com/search?query={q}",
+            "label": "Search on Ankorstore",
+            "description": "Curated European brands",
+        },
+    ],
+    "mass_market": [
+        {
+            "platform": "Alibaba",
+            "url": "https://www.alibaba.com/trade/search?SearchText={q}",
+            "label": "Search on Alibaba",
+            "description": "Manufacturers and wholesalers, negotiable MOQ",
+        },
+        {
+            "platform": "Made-in-China",
+            "url": "https://www.made-in-china.com/multi-search/{q}/F1/",
+            "label": "Search on Made-in-China",
+            "description": "Verified Chinese manufacturers",
+        },
+        {
+            "platform": "DHgate",
+            "url": "https://www.dhgate.com/wholesale/search.do?searchkey={q}",
+            "label": "Search on DHgate",
+            "description": "Small-batch wholesale, fast shipping",
+        },
+        {
+            "platform": "AliExpress",
+            "url": "https://www.aliexpress.com/wholesale?SearchText={q}",
+            "label": "Search on AliExpress",
+            "description": "Test small quantities before scaling",
+        },
+    ],
+    "unknown": [
+        {
+            "platform": "Alibaba",
+            "url": "https://www.alibaba.com/trade/search?SearchText={q}",
             "label": "Search on Alibaba",
             "description": "Manufacturers and wholesalers, negotiable MOQ",
         },
         {
             "platform": "AliExpress",
-            "url": f"https://www.aliexpress.com/wholesale?SearchText={q}",
+            "url": "https://www.aliexpress.com/wholesale?SearchText={q}",
             "label": "Search on AliExpress",
             "description": "Dropshipping with no minimum order",
         },
         {
-            "platform": "Made-in-China",
-            "url": f"https://www.made-in-china.com/multi-search/{q}/F1/",
-            "label": "Search on Made-in-China",
-            "description": "Verified Chinese manufacturers",
-        },
-        {
             "platform": "Europages",
-            "url": f"https://www.europages.co.uk/companies/{q}.html",
+            "url": "https://www.europages.co.uk/companies/{q}.html",
             "label": "Search on Europages",
             "description": "European suppliers, fast EU shipping",
         },
+    ],
+}
+
+
+def _build_sourcing_links(
+    query: str,
+    market: str = "US",
+    positioning: str = "unknown",
+) -> list[dict]:
+    q = urllib.parse.quote_plus(query)
+    conf = MARKET_CONFIG.get(market.upper(), MARKET_CONFIG["US"])
+    amazon_tld = conf.get("amazon_tld")
+    market_name = conf.get("name", market)
+
+    pos_key = positioning if positioning in SUPPLIER_PLATFORMS else "unknown"
+    platform_templates = SUPPLIER_PLATFORMS[pos_key]
+
+    links = [
+        {
+            "platform": t["platform"],
+            "url": t["url"].format(q=q),
+            "label": t["label"],
+            "description": t["description"],
+        }
+        for t in platform_templates
     ]
 
     if amazon_tld:
@@ -124,8 +224,18 @@ async def _tavily_search(api_key: str, query: str, max_results: int = 5) -> str:
         return f"[search unavailable: {e}]"
 
 
-async def _run_ai(query: str, category: str | None, market: str = "US") -> dict:
+async def _run_ai(
+    query: str,
+    category: str | None,
+    market: str = "US",
+    context: dict | None = None,
+) -> dict:
     from app.services.trends_service import get_trends_data
+
+    positioning = (context or {}).get("positioning", "unknown")
+    supplier_ctx = (context or {}).get("supplier_context", "")
+    channel = (context or {}).get("channel", "online")
+    target_customer = (context or {}).get("target_customer", "")
 
     conf = MARKET_CONFIG.get(market.upper(), MARKET_CONFIG["US"])
     amazon_tld = conf.get("amazon_tld", "com")
@@ -136,6 +246,16 @@ async def _run_ai(query: str, category: str | None, market: str = "US") -> dict:
     market_text = "[data unavailable]"
     supplier_text = "[data unavailable]"
     trends_data = None
+
+    # Build context-aware supplier search query
+    if positioning == "artisanal":
+        supplier_query = f"{query} European artisan manufacturer wholesale supplier"
+    elif positioning == "premium":
+        supplier_query = f"{query} premium manufacturer OEM private label wholesale"
+    elif positioning == "dropshipping":
+        supplier_query = f"{query} dropshipping supplier aliexpress spocket no MOQ"
+    else:
+        supplier_query = f"{query} wholesale supplier alibaba aliexpress price"
 
     tasks = [get_trends_data(query, market)]
     if settings.tavily_api_key:
@@ -151,7 +271,7 @@ async def _run_ai(query: str, category: str | None, market: str = "US") -> dict:
             ),
             _tavily_search(
                 settings.tavily_api_key,
-                f"{query} wholesale supplier alibaba aliexpress price",
+                supplier_query,
             ),
         ]
         results = await asyncio.gather(*tasks)
@@ -165,6 +285,21 @@ async def _run_ai(query: str, category: str | None, market: str = "US") -> dict:
     import anthropic
     client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
 
+    # Inject seller context into the prompt when available
+    context_note = ""
+    if context:
+        parts = []
+        if positioning and positioning != "unknown":
+            parts.append(f"positioning: {positioning}")
+        if channel:
+            parts.append(f"sales channel: {channel}")
+        if target_customer:
+            parts.append(f"target customer: {target_customer}")
+        if supplier_ctx:
+            parts.append(f"supplier preference: {supplier_ctx}")
+        if parts:
+            context_note = "\n**Seller context (from pre-search chat):** " + ", ".join(parts)
+
     prompt = USER_PROMPT.format(
         query=query,
         category=category or "unspecified",
@@ -176,7 +311,7 @@ async def _run_ai(query: str, category: str | None, market: str = "US") -> dict:
         amazon_results=amazon_text[:2500],
         market_results=market_text[:2000],
         supplier_results=supplier_text[:2000],
-    )
+    ) + context_note
 
     response = await client.messages.create(
         model="claude-sonnet-4-6",
@@ -191,7 +326,7 @@ async def _run_ai(query: str, category: str | None, market: str = "US") -> dict:
         raw = match.group(1)
 
     data = json.loads(raw)
-    data["sourcing_links"] = _build_sourcing_links(query, market)
+    data["sourcing_links"] = _build_sourcing_links(query, market, positioning)
 
     if trends_data:
         data["viability"]["trend_yoy"] = trends_data["trend_yoy"]
@@ -204,26 +339,28 @@ async def analyze_product(
     category: str | None = None,
     session_id: str = "anonymous",
     market: str = "US",
+    context: dict | None = None,
 ) -> dict:
+    positioning = (context or {}).get("positioning", "unknown")
     normalized = _normalize_query(f"{query}_{market.upper()}")
 
     # ── 1. Cache check ────────────────────────────────────────────────────────
     cached = await asyncio.to_thread(get_cached_search, normalized)
     if cached:
         asyncio.ensure_future(asyncio.to_thread(log_search, query, category, session_id, True))
-        cached["sourcing_links"] = _build_sourcing_links(query, market)
+        cached["sourcing_links"] = _build_sourcing_links(query, market, positioning)
         return cached
 
     # ── 2. AI pipeline ────────────────────────────────────────────────────────
     if not settings.anthropic_api_key:
-        data = _mock_response(query, market)
+        data = _mock_response(query, market, positioning)
     else:
         try:
-            data = await _run_ai(query, category, market)
+            data = await _run_ai(query, category, market, context)
         except Exception as e:
             import logging
             logging.getLogger(__name__).error("AI pipeline failed: %s", e)
-            data = _mock_response(query, market)
+            data = _mock_response(query, market, positioning)
 
     # ── 3. Persist ────────────────────────────────────────────────────────────
     try:
@@ -239,7 +376,7 @@ async def analyze_product(
     return data
 
 
-def _mock_response(query: str, market: str = "US") -> dict:
+def _mock_response(query: str, market: str = "US", positioning: str = "unknown") -> dict:
     return {
         "viability": {
             "score": 0,
@@ -257,5 +394,5 @@ def _mock_response(query: str, market: str = "US") -> dict:
             "trend_yoy": 0,
             "verdict": "Analysis unavailable: configure ANTHROPIC_API_KEY to enable AI search.",
         },
-        "sourcing_links": _build_sourcing_links(query, market),
+        "sourcing_links": _build_sourcing_links(query, market, positioning),
     }

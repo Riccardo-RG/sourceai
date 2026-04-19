@@ -32,3 +32,17 @@ export interface SourcingLink {
   label: string
   description: string
 }
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface SearchContext {
+  refined_query: string
+  positioning: 'mass_market' | 'artisanal' | 'premium' | 'dropshipping' | 'unknown'
+  market: string
+  channel: 'online' | 'store' | 'dropshipping'
+  target_customer: string
+  supplier_context: string
+}

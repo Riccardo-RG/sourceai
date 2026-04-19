@@ -1,26 +1,45 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import Navbar from '@/components/Navbar'
 import ProductInput from '@/components/sections/ProductInput'
 import MarginCalculator from '@/components/sections/MarginCalculator'
 import SourcingLinks from '@/components/sections/SourcingLinks'
 import ViabilityScore from '@/components/sections/ViabilityScore'
 import OutreachTracker from '@/components/sections/OutreachTracker'
+import MiriamChat from '@/components/sections/MiriamChat'
+import SavedSuppliers from '@/components/sections/SavedSuppliers'
 import { searchProduct } from '@/lib/api'
 import { useT } from '@/hooks/useT'
-import { SourcingLink } from '@/types'
+import { useMiriamStore } from '@/store/miriamStore'
+import { SourcingLink, SearchContext } from '@/types'
 
 type Step = 'idle' | 'validating' | 'sourcing' | 'done' | 'error'
+
+const POSITIONING_LABELS: Record<string, string> = {
+  mass_market: 'Mass market',
+  artisanal: 'Artigianale',
+  premium: 'Premium',
+  dropshipping: 'Dropshipping',
+  unknown: '—',
+}
+
+const CHANNEL_LABELS: Record<string, string> = {
+  online: 'Online',
+  store: 'Negozio fisico',
+  dropshipping: 'Dropshipping',
+}
 
 export default function Home() {
   const t = useT()
   const [step, setStep] = useState<Step>('idle')
   const [query, setQuery] = useState('')
-  const [viabilityData, setViabilityData] = useState<object | null>(null)
+  const [viabilityData, setViabilityData] = useState<Record<string, unknown> | null>(null)
   const [sourcingLinks, setSourcingLinks] = useState<SourcingLink[]>([])
 
-  const handleSearch = async (q: string, category?: string, market = 'US') => {
+  const { context, triggerAdvice, isStreaming, setMinimized } = useMiriamStore()
+
+  const handleSearch = async (q: string, category?: string, market = 'US', ctx?: SearchContext) => {
     setQuery(q)
     setStep('validating')
 
@@ -30,8 +49,8 @@ export default function Home() {
     )
 
     try {
-      const data = await searchProduct(q, category, market)
-      setViabilityData(data.viability)
+      const data = await searchProduct(q, category, market, ctx ?? undefined)
+      setViabilityData(data.viability as Record<string, unknown>)
       setSourcingLinks(data.sourcing_links)
       setStep('done')
     } catch {
@@ -40,6 +59,13 @@ export default function Home() {
       clearTimeout(timer)
     }
   }
+
+  const [verdictOpen, setVerdictOpen] = useState(false)
+
+  const handleAdviceCta = useCallback(() => {
+    if (!viabilityData) return
+    triggerAdvice(query, viabilityData)
+  }, [viabilityData, query, triggerAdvice])
 
   const isLoading = step === 'validating' || step === 'sourcing'
 
@@ -79,13 +105,72 @@ export default function Home() {
             </div>
           )}
 
+          {/* Search context banner — always shown when results are ready */}
+          {step === 'done' && (
+            <div className="animate-in fade-in duration-500">
+              {context ? (
+                /* Guided search — show Miriam's parameters + refine CTA */
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-xs font-semibold tracking-widest text-muted-foreground uppercase shrink-0">
+                    {t.miriam_context_label}
+                  </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <ContextPill label={t.miriam_positioning} value={POSITIONING_LABELS[context.positioning] ?? context.positioning} />
+                    {context.market !== 'global' && (
+                      <ContextPill label={t.miriam_market} value={context.market} />
+                    )}
+                    <ContextPill label={t.miriam_channel} value={CHANNEL_LABELS[context.channel] ?? context.channel} />
+                  </div>
+                  <span className="text-xs text-muted-foreground">{t.miriam_context_hint}</span>
+                  <button
+                    onClick={() => setMinimized(false)}
+                    className="text-xs font-medium text-primary hover:underline shrink-0"
+                  >
+                    {t.miriam_context_refine}
+                  </button>
+                </div>
+              ) : (
+                /* Generic search — suggest Miriam for refinement */
+                <p className="text-xs text-muted-foreground">
+                  {t.miriam_generic_hint}{' '}
+                  <button
+                    onClick={() => setMinimized(false)}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {t.miriam_generic_cta}
+                  </button>
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Step 01 */}
           {step !== 'idle' && step !== 'error' && (
             <section className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
               <StepHeader number="01" label={t.step_01}
                 isLoading={step === 'validating'} loadingText={t.step_loading.replace('{query}', query)} />
               {step !== 'validating' && viabilityData && (
-                <ViabilityScore data={viabilityData} query={query} />
+                <>
+                  {/* ViabilityScore commentato — score numerico da ridisegnare (basato su recensioni supplier) */}
+                  {/* <ViabilityScore data={viabilityData} query={query} /> */}
+
+                  <div className="flex flex-col gap-3">
+                    {/* Miriam advice CTA */}
+                    <button
+                      onClick={handleAdviceCta}
+                      disabled={isStreaming}
+                      className="flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-50 group w-fit"
+                    >
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors text-xs">
+                        ✦
+                      </span>
+                      {t.miriam_advice_cta}
+                    </button>
+
+                    {/* Claude verdict — expandable, temporary for testing */}
+                    <VerdictCard viabilityData={viabilityData} open={verdictOpen} onToggle={() => setVerdictOpen((v) => !v)} />
+                  </div>
+                </>
               )}
             </section>
           )}
@@ -109,7 +194,7 @@ export default function Home() {
 
           {/* Step 04 */}
           {step === 'done' && (
-            <section className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500 pb-16">
+            <section className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500 pb-32">
               <StepHeader number="04" label={t.step_04} />
               <OutreachTracker />
             </section>
@@ -139,7 +224,47 @@ export default function Home() {
 
         </div>
       </main>
+
+      {/* Miriam chat panel — fixed bottom-right */}
+      <MiriamChat onSearch={handleSearch} />
+
+      {/* Saved suppliers panel — fixed bottom-left, hidden when empty */}
+      <SavedSuppliers />
     </>
+  )
+}
+
+function VerdictCard({ viabilityData, open, onToggle }: {
+  viabilityData: Record<string, unknown> | null
+  open: boolean
+  onToggle: () => void
+}) {
+  const verdict = typeof viabilityData?.verdict === 'string' ? viabilityData.verdict : null
+  if (!verdict) return null
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit"
+      >
+        <span className="text-xs">{open ? '▼' : '▶'}</span>
+        <span>Analisi Claude (sperimentale)</span>
+      </button>
+      {open && (
+        <div className="mt-2 px-4 py-3 rounded-xl border border-border bg-muted/30 text-sm text-muted-foreground leading-relaxed max-w-xl">
+          {verdict}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ContextPill({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border border-border bg-muted/50 text-muted-foreground">
+      <span className="text-muted-foreground/60">{label}:</span>
+      <span className="font-medium text-foreground">{value}</span>
+    </span>
   )
 }
 
