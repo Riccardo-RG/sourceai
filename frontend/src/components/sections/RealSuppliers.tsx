@@ -31,12 +31,12 @@ interface Props {
 export default function RealSuppliers({ suppliers, query, market = 'Global' }: Props) {
   if (!suppliers || suppliers.length === 0) {
     return (
-      <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed border-border bg-muted/20 text-sm text-muted-foreground">
-        <span className="text-base shrink-0">🔍</span>
+      <div className="flex items-center gap-2 px-4 py-3 rounded-md border border-dashed border-border text-xs text-muted-foreground">
+        <span className="text-muted-foreground/40">○</span>
         <span>
-          Nessun fornitore trovato per questa ricerca.{' '}
-          <span className="font-medium text-foreground">Prova a raffinare la query con Miriam</span>{' '}
-          per ottenere risultati più specifici.
+          Nessun fornitore trovato.{' '}
+          <span className="font-medium text-foreground">Raffina la query con Miriam</span>{' '}
+          per risultati più specifici.
         </span>
       </div>
     )
@@ -44,18 +44,17 @@ export default function RealSuppliers({ suppliers, query, market = 'Global' }: P
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wide">
-          Supplier trovati
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-widest">
+          Supplier — {suppliers.length} trovati
         </span>
-        <span className="text-xs text-muted-foreground/40">•</span>
-        <span className="text-xs text-muted-foreground/50">{suppliers.length} risultati</span>
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full ml-1">
-          🟡 Dato indicativo
+        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+          Dato indicativo
         </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {suppliers.map((s, i) => (
           <SupplierCard key={i} supplier={s} query={query} market={market} />
         ))}
@@ -96,31 +95,28 @@ function SupplierCard({ supplier: s, query, market }: { supplier: RealSupplier; 
   }
 
   return (
-    <div className="group flex flex-col gap-3 p-4 rounded-xl border border-border bg-card hover:border-primary/30 hover:shadow-sm transition-all duration-150">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-base shrink-0">{icon}</span>
-          <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border ${badgeClass} shrink-0`}>
-            {s.platform}
-          </span>
-        </div>
+    <div className="flex flex-col gap-2.5 p-3.5 rounded-md border border-border bg-background hover:border-primary/30 transition-colors duration-150">
+      {/* Platform + link */}
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${badgeClass}`}>
+          {s.platform}
+        </span>
         <a
           href={s.url}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="text-muted-foreground/40 hover:text-primary transition-colors shrink-0 mt-0.5"
+          className="text-muted-foreground/30 hover:text-primary transition-colors"
           title="Apri sito"
         >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
           </svg>
         </a>
       </div>
 
       {/* Name + description */}
-      <div className="space-y-1 min-w-0">
+      <div className="min-w-0">
         <a
           href={s.url}
           target="_blank"
@@ -130,30 +126,32 @@ function SupplierCard({ supplier: s, query, market }: { supplier: RealSupplier; 
           {s.name}
         </a>
         {s.description && (
-          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 mt-0.5">
             {s.description}
           </p>
         )}
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-2 mt-auto pt-1 border-t border-border/50">
+      <div className="flex items-center gap-1.5 pt-1.5 border-t border-border/40">
         <button
           onClick={handleOutreach}
           disabled={isAlreadyTracked || outreachDone}
-          className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md border border-border hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-colors disabled:opacity-50 disabled:cursor-default"
+          className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded border transition-colors disabled:cursor-default
+            ${isAlreadyTracked || outreachDone
+              ? 'text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30'
+              : 'text-muted-foreground border-border hover:text-primary hover:border-primary/40 hover:bg-primary/5'}`}
         >
-          {isAlreadyTracked || outreachDone
-            ? <><span>✓</span> Tracciato</>
-            : <><span>+</span> Outreach</>}
+          {isAlreadyTracked || outreachDone ? '✓ Tracciato' : '+ Outreach'}
         </button>
         <button
           onClick={handleEmail}
-          className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md border border-border hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-colors"
+          className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded border transition-colors
+            ${emailCopied
+              ? 'text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30'
+              : 'text-muted-foreground border-border hover:text-primary hover:border-primary/40 hover:bg-primary/5'}`}
         >
-          {emailCopied
-            ? <><span>✓</span> Copiata!</>
-            : <><span>📋</span> Email</>}
+          {emailCopied ? '✓ Copiata!' : '↗ Email'}
         </button>
       </div>
     </div>

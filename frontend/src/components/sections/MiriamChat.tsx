@@ -195,53 +195,53 @@ export default function MiriamChat({ onSearch }: Props) {
   return (
     <div
       style={{ height: panelHeight }}
-      className="fixed bottom-0 right-0 sm:right-4 z-50 w-full sm:w-80 flex flex-col rounded-t-xl border border-border bg-background shadow-2xl overflow-hidden"
+      className="fixed bottom-0 right-0 sm:right-4 z-50 w-full sm:w-72 flex flex-col rounded-t-lg border border-border bg-background shadow-xl overflow-hidden"
     >
       {/* Drag handle */}
       {!minimized && (
         <div
           onMouseDown={onDragStart}
-          className="absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize bg-border/40 hover:bg-primary/40 transition-colors z-10"
+          className="absolute top-0 left-0 right-0 h-1 cursor-ns-resize bg-border/30 hover:bg-primary/30 transition-colors z-10"
         />
       )}
 
       {/* Header */}
       <div
-        className="flex items-center justify-between px-3 select-none border-b border-border bg-muted/40 shrink-0"
+        className="flex items-center justify-between px-3 select-none border-b border-border bg-muted/20 shrink-0"
         style={{ height: HEADER_HEIGHT }}
       >
         <div
           className="flex items-center gap-2 flex-1 cursor-pointer"
           onClick={() => setMinimized(!minimized)}
         >
-          <span className="text-sm font-semibold text-foreground">{t.miriam_title}</span>
-          {isStreaming && <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
+          <span className="text-xs font-semibold text-foreground tracking-wide">{t.miriam_title}</span>
+          {isStreaming && <span className="inline-block w-1 h-1 rounded-full bg-primary animate-pulse" />}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           {messages.length > 1 && !isStreaming && (
             <button
               onClick={(e) => { e.stopPropagation(); handleClear() }}
               title="Nuova chat"
-              className="p-1 rounded text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+              className="p-1 rounded text-muted-foreground/30 hover:text-red-500 transition-colors"
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path d="M18 6L6 18M6 6l12 12"/>
               </svg>
             </button>
           )}
-          <span
-            className="text-muted-foreground text-xs cursor-pointer px-1"
+          <button
+            className="text-muted-foreground/40 text-[10px] cursor-pointer px-1 hover:text-muted-foreground transition-colors"
             onClick={() => setMinimized(!minimized)}
           >
             {minimized ? '▲' : '▼'}
-          </span>
+          </button>
         </div>
       </div>
 
       {/* Body */}
       {!minimized && (
         <>
-          <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3 min-h-0">
+          <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2.5 min-h-0">
             {messages.map((msg, i) => (
               <MessageBubble key={i} role={msg.role} content={msg.content} suppliers={msg.suppliers} />
             ))}
@@ -249,7 +249,7 @@ export default function MiriamChat({ onSearch }: Props) {
               <MessageBubble role="assistant" content={streamingText} streaming />
             )}
             {isStreaming && !streamingText && (
-              <p className="text-xs text-muted-foreground italic">{t.miriam_typing}</p>
+              <p className="text-[11px] text-muted-foreground/60 italic">{t.miriam_typing}</p>
             )}
             <div ref={messagesEndRef} />
           </div>
@@ -262,13 +262,13 @@ export default function MiriamChat({ onSearch }: Props) {
               onKeyDown={handleKeyDown}
               placeholder={t.miriam_placeholder}
               disabled={isStreaming}
-              className="flex-1 resize-none text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground min-h-[28px] max-h-20"
+              className="flex-1 resize-none text-xs bg-transparent outline-none placeholder:text-muted-foreground/50 text-foreground min-h-[24px] max-h-16"
               style={{ fieldSizing: 'content' } as React.CSSProperties}
             />
             <button
               onClick={() => sendMessage(input)}
               disabled={isStreaming || !input.trim()}
-              className="text-xs font-medium px-2.5 py-1.5 rounded-md bg-primary text-primary-foreground disabled:opacity-40 hover:bg-primary/90 transition-colors shrink-0"
+              className="text-[10px] font-semibold px-2.5 py-1.5 rounded bg-primary text-primary-foreground disabled:opacity-30 hover:bg-primary/90 transition-colors shrink-0"
             >
               {t.miriam_send}
             </button>
@@ -292,27 +292,25 @@ function MessageBubble({
 
   if (suppliers && suppliers.length > 0) {
     return (
-      <div className="flex justify-start">
-        <div className="w-full flex flex-col gap-1.5">
-          {suppliers.map((s) => (
-            <a
-              key={s.platform}
-              href={s.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-border bg-card hover:bg-muted/50 transition-colors group"
-            >
-              <span className="text-base shrink-0">{PLATFORM_ICONS[s.platform] ?? '🔗'}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{s.platform}</p>
-                <p className="text-xs text-muted-foreground truncate">{s.description}</p>
-              </div>
-              <svg className="w-3 h-3 text-muted-foreground/40 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
-              </svg>
-            </a>
-          ))}
-        </div>
+      <div className="flex flex-col gap-1">
+        {suppliers.map((s) => (
+          <a
+            key={s.platform}
+            href={s.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded border border-border bg-background hover:bg-muted/40 transition-colors group"
+          >
+            <span className="text-sm shrink-0">{PLATFORM_ICONS[s.platform] ?? '🔗'}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors">{s.platform}</p>
+              <p className="text-[10px] text-muted-foreground truncate">{s.description}</p>
+            </div>
+            <svg className="w-2.5 h-2.5 text-muted-foreground/30 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+            </svg>
+          </a>
+        ))}
       </div>
     )
   }
@@ -323,14 +321,14 @@ function MessageBubble({
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
         className={`
-          max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap
+          max-w-[88%] rounded px-2.5 py-1.5 text-xs leading-relaxed whitespace-pre-wrap
           ${isUser
-            ? 'bg-primary text-primary-foreground rounded-br-sm'
+            ? 'bg-primary text-primary-foreground'
             : isWarning
-              ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-bl-sm'
-              : 'bg-muted text-foreground rounded-bl-sm'
+              ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60'
+              : 'bg-muted text-foreground'
           }
-          ${streaming ? 'after:content-["▋"] after:animate-pulse after:text-muted-foreground' : ''}
+          ${streaming ? 'after:content-["▋"] after:animate-pulse after:text-muted-foreground/50' : ''}
         `}
       >
         {content}
