@@ -11,6 +11,7 @@ import MiriamChat from '@/components/sections/MiriamChat'
 import SavedSuppliers from '@/components/sections/SavedSuppliers'
 import { searchProduct } from '@/lib/api'
 import { useT } from '@/hooks/useT'
+import { useLangStore } from '@/store/langStore'
 import { useMiriamStore } from '@/store/miriamStore'
 import { useMarginStore } from '@/store/marginStore'
 import { SourcingLink, SearchContext, RealSupplier } from '@/types'
@@ -33,6 +34,7 @@ const CHANNEL_LABELS: Record<string, string> = {
 
 export default function Home() {
   const t = useT()
+  const lang = useLangStore((s) => s.lang)
   const [step, setStep] = useState<Step>('idle')
   const [query, setQuery] = useState('')
   const [currentMarket, setCurrentMarket] = useState('GLOBAL')
@@ -54,7 +56,7 @@ export default function Home() {
     )
 
     try {
-      const data = await searchProduct(q, category, market, ctx ?? undefined)
+      const data = await searchProduct(q, category, market, ctx ?? undefined, lang)
       setViabilityData(data.viability as Record<string, unknown>)
       setSourcingLinks(data.sourcing_links)
       const rs = data.real_suppliers ?? []
@@ -151,8 +153,8 @@ export default function Home() {
             <div className="rounded-md border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 flex items-center gap-3">
               <span className="text-sm shrink-0 text-amber-600">⏱</span>
               <div>
-                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Troppe ricerche in poco tempo</p>
-                <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Attendi qualche secondo prima di lanciare una nuova ricerca.</p>
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">{t.rate_limit_title}</p>
+                <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">{t.rate_limit_body}</p>
               </div>
             </div>
           )}
@@ -212,7 +214,7 @@ export default function Home() {
                       <span className="text-primary text-xs leading-none">✦</span>
                       <div className="text-left">
                         <p className="text-xs font-semibold text-foreground">{t.miriam_advice_cta}</p>
-                        <p className="text-[10px] text-muted-foreground">Chiedilo a Miriam →</p>
+                        <p className="text-[10px] text-muted-foreground">{t.miriam_cta_sub}</p>
                       </div>
                     </button>
 
@@ -287,20 +289,13 @@ export default function Home() {
   )
 }
 
-const LOADING_STEPS = [
-  'Ricerca prezzi su Amazon...',
-  'Analisi trend di mercato...',
-  'Ricerca supplier B2B...',
-  'Analisi con AI in corso...',
-  'Quasi pronto...',
-]
-
 function LoadingSteps() {
+  const t = useT()
   const [idx, setIdx] = useState(0)
   useEffect(() => {
-    const id = setInterval(() => setIdx((i) => Math.min(i + 1, LOADING_STEPS.length - 1)), 4000)
+    const id = setInterval(() => setIdx((i) => Math.min(i + 1, t.loading_steps.length - 1)), 4000)
     return () => clearInterval(id)
-  }, [])
+  }, [t.loading_steps.length])
   return (
     <div className="flex items-center gap-2.5 text-xs text-muted-foreground animate-in fade-in duration-300">
       <span className="flex gap-0.5">
@@ -309,18 +304,19 @@ function LoadingSteps() {
             style={{ animationDelay: `${i * 0.15}s` }} />
         ))}
       </span>
-      <span key={idx} className="animate-in fade-in duration-500">{LOADING_STEPS[idx]}</span>
+      <span key={idx} className="animate-in fade-in duration-500">{t.loading_steps[idx]}</span>
     </div>
   )
 }
 
 function ScoresRow({ data }: { data: Record<string, unknown> | null }) {
+  const t = useT()
   if (!data) return null
   const scores = [
-    { label: 'Domanda', key: 'demand', invert: false },
-    { label: 'Concorrenza', key: 'competition', invert: true },
-    { label: 'Margine', key: 'margin_potential', invert: false },
-    { label: 'Sourcing', key: 'sourcing_ease', invert: false },
+    { label: t.score_demand, key: 'demand', invert: false },
+    { label: t.score_competition, key: 'competition', invert: true },
+    { label: t.score_margin, key: 'margin_potential', invert: false },
+    { label: t.score_sourcing, key: 'sourcing_ease', invert: false },
   ] as const
 
   const hasAny = scores.some(s => typeof data[s.key] === 'number')
@@ -387,6 +383,7 @@ function TrendsCard({ data }: { data: Record<string, unknown> | null }) {
 }
 
 function PriceRangeCard({ data }: { data: Record<string, unknown> | null }) {
+  const t = useT()
   const priceMin = typeof data?.price_range_min === 'number' ? data.price_range_min : 0
   const priceMax = typeof data?.price_range_max === 'number' ? data.price_range_max : 0
   if (priceMin === 0 && priceMax === 0) return null
@@ -399,7 +396,7 @@ function PriceRangeCard({ data }: { data: Record<string, unknown> | null }) {
       </span>
       <span className="text-muted-foreground/40">·</span>
       <span className="text-muted-foreground">
-        Prezzi rilevati{' '}
+        {t.price_detected}{' '}
         <span className="font-semibold text-foreground">
           {priceMin > 0 ? `${priceMin.toFixed(0)}` : '?'}
           {priceMax > 0 && priceMax !== priceMin ? ` – ${priceMax.toFixed(0)}` : ''}
@@ -414,6 +411,7 @@ function VerdictCard({ viabilityData, open, onToggle }: {
   open: boolean
   onToggle: () => void
 }) {
+  const t = useT()
   const verdict = typeof viabilityData?.verdict === 'string' ? viabilityData.verdict : null
   if (!verdict) return null
   return (
@@ -423,7 +421,7 @@ function VerdictCard({ viabilityData, open, onToggle }: {
         className="flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors w-fit"
       >
         <span>{open ? '▼' : '▶'}</span>
-        <span>Analisi Claude</span>
+        <span>{t.verdict_label}</span>
       </button>
       {open && (
         <div className="mt-2 px-3.5 py-2.5 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground leading-relaxed max-w-xl">

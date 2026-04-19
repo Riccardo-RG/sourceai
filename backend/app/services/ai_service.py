@@ -452,11 +452,18 @@ async def _search_real_suppliers(
     return suppliers, supplier_text
 
 
+_LANG_NAMES = {
+    "it": "Italian", "es": "Spanish", "fr": "French",
+    "de": "German", "pt": "Portuguese", "ja": "Japanese", "en": "English",
+}
+
+
 async def _run_ai(
     query: str,
     category: str | None,
     market: str = "GLOBAL",
     context: dict | None = None,
+    lang: str = "en",
 ) -> dict:
     from app.services.trends_service import get_trends_data
 
@@ -521,6 +528,12 @@ async def _run_ai(
         if parts:
             context_note = "\n**Seller context (from pre-search chat):** " + ", ".join(parts)
 
+    response_lang = _LANG_NAMES.get(lang, "English")
+    lang_instruction = (
+        f"\n\nLANGUAGE RULE: Write all text fields (verdict, demand_note, competition_note, margin_note, sourcing_note, recommended_channels) in {response_lang}. JSON keys must remain in English."
+        if response_lang != "English" else ""
+    )
+
     prompt = USER_PROMPT.format(
         query=query,
         category=category or "unspecified",
@@ -532,7 +545,7 @@ async def _run_ai(
         amazon_results=amazon_text[:2500],
         market_results=market_text[:2000],
         supplier_results=supplier_text[:2000],
-    ) + context_note
+    ) + context_note + lang_instruction
 
     response = await client.messages.create(
         model="claude-sonnet-4-6",
@@ -575,6 +588,7 @@ async def analyze_product(
     session_id: str = "anonymous",
     market: str = "US",
     context: dict | None = None,
+    lang: str = "en",
 ) -> dict:
     positioning = (context or {}).get("positioning", "unknown")
     normalized = _normalize_query(f"{query}_{market.upper()}")
@@ -603,7 +617,7 @@ async def analyze_product(
         data = _mock_response(query, market, positioning)
     else:
         try:
-            data = await _run_ai(query, category, market, context)
+            data = await _run_ai(query, category, market, context, lang)
         except Exception as e:
             import logging
             logging.getLogger(__name__).error("AI pipeline failed: %s", e)

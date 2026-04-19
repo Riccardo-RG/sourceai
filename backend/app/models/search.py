@@ -22,6 +22,7 @@ class SearchRequest(BaseModel):
     session_id: str = "anonymous"
     market: str = "GLOBAL"
     context: dict | None = None  # Miriam chat context: positioning, channel, etc.
+    lang: str = "en"  # UI language for localized Claude responses
 
 
 class SearchResponse(BaseModel):

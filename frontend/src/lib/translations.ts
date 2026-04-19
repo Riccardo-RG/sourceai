@@ -179,6 +179,18 @@ export interface T {
   auth_redirect: string
   auth_password_short: string
 
+  // Page — hardcoded strings now translated
+  loading_steps: string[]
+  score_demand: string
+  score_competition: string
+  score_margin: string
+  score_sourcing: string
+  verdict_label: string
+  price_detected: string
+  miriam_cta_sub: string
+  rate_limit_title: string
+  rate_limit_body: string
+
   // Miriam chat
   miriam_title: string
   miriam_placeholder: string
@@ -377,6 +389,23 @@ const en: T = {
   auth_redirect: 'Redirecting…',
   auth_password_short: 'Minimum 6 characters',
 
+  loading_steps: [
+    'Searching prices on Amazon…',
+    'Analyzing market trends…',
+    'Searching B2B suppliers…',
+    'AI analysis in progress…',
+    'Almost ready…',
+  ],
+  score_demand: 'Demand',
+  score_competition: 'Competition',
+  score_margin: 'Margin',
+  score_sourcing: 'Sourcing',
+  verdict_label: 'Claude analysis',
+  price_detected: 'Prices detected',
+  miriam_cta_sub: 'Ask Miriam →',
+  rate_limit_title: 'Too many searches in a short time',
+  rate_limit_body: 'Wait a few seconds before launching a new search.',
+
   miriam_title: 'Miriam · AI Research',
   miriam_placeholder: 'Tell me what you want to sell…',
   miriam_send: 'Send',
@@ -574,6 +603,23 @@ const it: T = {
   auth_redirect: 'Reindirizzamento in corso…',
   auth_password_short: 'Minimo 6 caratteri',
 
+  loading_steps: [
+    'Ricerca prezzi su Amazon…',
+    'Analisi trend di mercato…',
+    'Ricerca supplier B2B…',
+    'Analisi con AI in corso…',
+    'Quasi pronto…',
+  ],
+  score_demand: 'Domanda',
+  score_competition: 'Concorrenza',
+  score_margin: 'Margine',
+  score_sourcing: 'Sourcing',
+  verdict_label: 'Analisi Claude',
+  price_detected: 'Prezzi rilevati',
+  miriam_cta_sub: 'Chiedilo a Miriam →',
+  rate_limit_title: 'Troppe ricerche in poco tempo',
+  rate_limit_body: 'Attendi qualche secondo prima di lanciare una nuova ricerca.',
+
   miriam_title: 'Miriam · Ricerca AI',
   miriam_placeholder: 'Dimmi cosa vuoi vendere…',
   miriam_send: 'Invia',
@@ -770,6 +816,23 @@ const es: T = {
   auth_reset_success: '¡Contraseña actualizada!',
   auth_redirect: 'Redirigiendo…',
   auth_password_short: 'Mínimo 6 caracteres',
+
+  loading_steps: [
+    'Buscando precios en Amazon…',
+    'Analizando tendencias de mercado…',
+    'Buscando proveedores B2B…',
+    'Análisis con IA en curso…',
+    'Casi listo…',
+  ],
+  score_demand: 'Demanda',
+  score_competition: 'Competencia',
+  score_margin: 'Margen',
+  score_sourcing: 'Sourcing',
+  verdict_label: 'Análisis Claude',
+  price_detected: 'Precios detectados',
+  miriam_cta_sub: 'Pregunta a Miriam →',
+  rate_limit_title: 'Demasiadas búsquedas en poco tiempo',
+  rate_limit_body: 'Espera unos segundos antes de lanzar una nueva búsqueda.',
 
   miriam_title: 'Miriam · Investigación AI',
   miriam_placeholder: 'Dime qué quieres vender…',

@@ -16,7 +16,7 @@ async def search(req: SearchRequest, user_id: str = Depends(get_user_id)):
     check_rate_limit(user_id)
 
     try:
-        data = await analyze_product(req.query.strip(), req.category, user_id, req.market, req.context)
+        data = await analyze_product(req.query.strip(), req.category, user_id, req.market, req.context, req.lang)
         return SearchResponse(
             viability=ViabilityScore(**data["viability"]),
             sourcing_links=[SourcingLink(**lnk) for lnk in data["sourcing_links"]],
