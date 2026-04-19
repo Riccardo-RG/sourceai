@@ -29,15 +29,15 @@ async def get_user_id(
             sb = get_supabase()
             response = sb.auth.get_user(token)
             return str(response.user.id)
-        except RuntimeError:
-            # Supabase not configured — extract sub from JWT payload (unverified)
-            logger.warning("Supabase not configured, extracting sub from JWT unverified")
+        except Exception as e:
+            # Supabase not configured, wrong key, or token issue —
+            # fall back to extracting sub from JWT payload (unverified)
+            logger.warning("Supabase auth failed (%s), falling back to JWT sub", e)
             sub = _jwt_sub(token)
             if sub:
                 return sub
-        except Exception as e:
-            logger.error("Token verification failed: %s", e)
-            raise HTTPException(status_code=401, detail=f"Token non valido: {e}")
+            logger.error("Could not extract sub from JWT: %s", e)
+            raise HTTPException(status_code=401, detail="Token non valido")
 
     if x_session_id:
         return x_session_id
