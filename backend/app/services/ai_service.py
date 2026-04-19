@@ -289,9 +289,20 @@ async def _search_real_suppliers(
     client = AsyncTavilyClient(api_key=api_key)
     market_upper = market.upper()
 
-    # Pick the single most relevant B2B source for this context
-    if positioning in ("artisanal", "premium") or market_upper in ("EUROPE", "GB"):
-        sq = f"site:europages.com {query} manufacturer supplier"
+    # Pick the most relevant B2B source based on positioning + market
+    if positioning == "artisanal":
+        # Faire and Ankorstore curate small independent artisan brands
+        if market_upper in ("EUROPE", "GB"):
+            sq = f"site:ankorstore.com {query} brand"
+        else:
+            sq = f"site:faire.com {query} brand"
+    elif positioning == "premium":
+        if market_upper in ("EUROPE", "GB"):
+            sq = f"site:europages.co.uk {query} manufacturer"
+        else:
+            sq = f"site:alibaba.com {query} verified supplier premium"
+    elif positioning == "dropshipping":
+        sq = f"site:spocket.co {query} supplier"
     elif market_upper == "LATAM":
         sq = f"site:made-in-china.com {query} manufacturer"
     else:
@@ -311,11 +322,13 @@ async def _search_real_suppliers(
     ) or "[no supplier data found]"
 
     def _platform_from_url(url: str) -> str:
+        if "faire.com" in url:     return "Faire"
+        if "ankorstore" in url:    return "Ankorstore"
         if "europages" in url:     return "Europages"
         if "alibaba.com" in url:   return "Alibaba"
         if "made-in-china" in url: return "Made-in-China"
-        if "ankorstore" in url:    return "Ankorstore"
-        if "faire.com" in url:     return "Faire"
+        if "spocket" in url:       return "Spocket"
+        if "dhgate" in url:        return "DHgate"
         return "Web"
 
     def _clean_name(title: str, platform: str) -> str:
@@ -335,6 +348,7 @@ async def _search_real_suppliers(
         "/en/products/", "/catalog/", "page=", "?q=",
         "/product-detail/", "/product/", "?keyword=", "/offers-for-sale",
         "/multi-search/", "showroom", "/p-detail", "offerList",
+        "/products?", "/search/", "?search=", "?query=",
     ]
 
     suppliers: list[dict] = []
