@@ -160,12 +160,13 @@ export default function Home() {
                     <button
                       onClick={handleAdviceCta}
                       disabled={isStreaming}
-                      className="flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-50 group w-fit"
+                      className="flex items-center gap-3 px-4 py-3 rounded-xl border border-primary/25 bg-primary/5 hover:bg-primary/10 transition-colors disabled:opacity-50 w-fit group"
                     >
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors text-xs">
-                        ✦
-                      </span>
-                      {t.miriam_advice_cta}
+                      <span className="text-primary text-base leading-none">✦</span>
+                      <div className="text-left">
+                        <p className="text-sm font-semibold text-foreground">{t.miriam_advice_cta}</p>
+                        <p className="text-xs text-muted-foreground">Chiedilo a Miriam →</p>
+                      </div>
                     </button>
 
                     {/* Claude verdict — expandable, temporary for testing */}

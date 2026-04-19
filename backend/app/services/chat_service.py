@@ -37,9 +37,14 @@ For a valid search ready to launch:
 For an invalid/unsearchable query:
 <INVALID_QUERY>{"reason": "..."}</INVALID_QUERY>
 
+When the user explicitly asks about suppliers, sourcing platforms, or where to find a product (WITHOUT launching a full search), emit AFTER your text:
+<SUPPLIERS>{"query": "...", "market": "GLOBAL|EUROPE|NORTH_AMERICA|LATAM|ASIA_PACIFIC|MIDDLE_EAST", "platforms": ["Platform1", "Platform2", "Platform3"]}</SUPPLIERS>
+Available platforms: Alibaba, AliExpress, Europages, Ankorstore, Faire, DHgate, Made-in-China, Spocket, Mercado Libre
+Choose 3-4 platforms most relevant to market and positioning discussed. Do NOT emit SUPPLIERS when you also emit SEARCH_READY.
+
 supplier_context should be a brief note like "artisanal European suppliers preferred" or "dropshipping via AliExpress/Spocket" to guide supplier platform selection.
 
-IMPORTANT: emit the signal JSON on a single line, never split across lines.
+IMPORTANT: emit signal JSON on a single line, never split across lines.
 """
 
 
@@ -86,8 +91,12 @@ async def stream_miriam_response(
             else:
                 buffer += text
                 # Check if a signal tag is starting
-                if "<SEARCH_READY>" in buffer or "<INVALID_QUERY>" in buffer:
-                    tag = "<SEARCH_READY>" if "<SEARCH_READY>" in buffer else "<INVALID_QUERY>"
+                if "<SEARCH_READY>" in buffer or "<INVALID_QUERY>" in buffer or "<SUPPLIERS>" in buffer:
+                    tag = (
+                        "<SEARCH_READY>" if "<SEARCH_READY>" in buffer
+                        else "<INVALID_QUERY>" if "<INVALID_QUERY>" in buffer
+                        else "<SUPPLIERS>"
+                    )
                     idx = buffer.find(tag)
                     before = buffer[:idx]
                     if before:

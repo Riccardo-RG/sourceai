@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useMiriamStore } from '@/store/miriamStore'
 import { streamMiriam } from '@/lib/api'
 import { useT } from '@/hooks/useT'
-import type { SearchContext } from '@/types'
+import type { SearchContext, SupplierCard } from '@/types'
 
 interface Props {
   onSearch: (query: string, category?: string, market?: string, context?: SearchContext) => void
@@ -12,7 +12,36 @@ interface Props {
 
 const HEADER_HEIGHT = 44
 
-// Builds the advice request message sent to Miriam when CTA is clicked
+const SUPPLIER_URLS: Record<string, (q: string) => string> = {
+  'Alibaba':       q => `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(q)}`,
+  'AliExpress':    q => `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(q)}`,
+  'Europages':     q => `https://www.europages.co.uk/companies/${encodeURIComponent(q)}.html`,
+  'Ankorstore':    q => `https://www.ankorstore.com/search?query=${encodeURIComponent(q)}`,
+  'Faire':         q => `https://www.faire.com/search?q=${encodeURIComponent(q)}`,
+  'DHgate':        q => `https://www.dhgate.com/wholesale/search.do?searchkey=${encodeURIComponent(q)}`,
+  'Made-in-China': q => `https://www.made-in-china.com/multi-search/${encodeURIComponent(q)}/F1/`,
+  'Spocket':       q => `https://www.spocket.co/products?search=${encodeURIComponent(q)}`,
+  'Mercado Libre': q => `https://listado.mercadolibre.com.mx/search?as_word=${encodeURIComponent(q)}`,
+}
+
+const PLATFORM_ICONS: Record<string, string> = {
+  'Alibaba': '🏭', 'AliExpress': '📦', 'Europages': '🇪🇺',
+  'Ankorstore': '🎨', 'Faire': '✦', 'DHgate': '🏪',
+  'Made-in-China': '🇨🇳', 'Spocket': '🚀', 'Mercado Libre': '🛒',
+}
+
+const PLATFORM_DESCRIPTIONS: Record<string, string> = {
+  'Alibaba': 'Manufacturers & wholesalers',
+  'AliExpress': 'No MOQ, dropshipping-friendly',
+  'Europages': 'European manufacturers',
+  'Ankorstore': 'European artisan brands',
+  'Faire': 'Independent brands, net-60',
+  'DHgate': 'Small-batch wholesale',
+  'Made-in-China': 'Verified Chinese manufacturers',
+  'Spocket': 'EU/US suppliers, fast shipping',
+  'Mercado Libre': 'Latin America marketplace',
+}
+
 function buildAdviceMessage(query: string, viability: Record<string, unknown>): string {
   const score = viability.score ?? '—'
   const demand = viability.demand ?? '—'
@@ -25,47 +54,49 @@ function buildAdviceMessage(query: string, viability: Record<string, unknown>): 
 export default function MiriamChat({ onSearch }: Props) {
   const t = useT()
   const {
-    messages,
-    minimized,
-    height,
-    isStreaming,
-    pendingAdvice,
-    addMessage,
-    setContext,
-    setMinimized,
-    setHeight,
-    setIsStreaming,
-    clearPendingAdvice,
+    messages, minimized, height, isStreaming, pendingAdvice,
+    addMessage, setContext, setMinimized, setHeight,
+    setIsStreaming, clearPendingAdvice, reset,
   } = useMiriamStore()
 
   const [input, setInput] = useState('')
   const [streamingText, setStreamingText] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ startY: number; startH: number } | null>(null)
-  const hasInitialized = useRef(false)
+  const hasWelcomed = useRef(false)
 
-  // Send welcome once (only if no persisted messages)
+  // Welcome on first load
   useEffect(() => {
-    if (!hasInitialized.current && messages.length === 0) {
-      hasInitialized.current = true
-      addMessage({ role: 'assistant', content: t.miriam_welcome })
-    } else {
-      hasInitialized.current = true
+    if (messages.length === 0) {
+      hasWelcomed.current = false
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!hasWelcomed.current) {
+      hasWelcomed.current = true
+      if (messages.length === 0) {
+        addMessage({ role: 'assistant', content: t.miriam_welcome })
+      }
+    }
+  }, []) // eslint-disable-line
+
+  // Re-add welcome after clear
+  useEffect(() => {
+    if (messages.length === 0 && hasWelcomed.current) {
+      addMessage({ role: 'assistant', content: t.miriam_welcome })
+    }
+  }, [messages.length]) // eslint-disable-line
 
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamingText])
 
-  // Handle CTA-triggered advice request
+  // CTA-triggered advice
   useEffect(() => {
     if (!pendingAdvice || isStreaming) return
     const msg = buildAdviceMessage(pendingAdvice.query, pendingAdvice.viability)
     clearPendingAdvice()
-    sendMessage(msg, true) // silent = don't show as user bubble
-  }, [pendingAdvice]) // eslint-disable-line react-hooks/exhaustive-deps
+    sendMessage(msg, true)
+  }, [pendingAdvice]) // eslint-disable-line
 
   const parseSignal = useCallback((signal: string): void => {
     if (signal.includes('<SEARCH_READY>')) {
@@ -74,24 +105,37 @@ export default function MiriamChat({ onSearch }: Props) {
         try {
           const ctx: SearchContext = JSON.parse(match[1])
           setContext(ctx)
-          const market = ctx.market.toUpperCase()
-          onSearch(ctx.refined_query, undefined, market, ctx)
-        } catch { /* malformed json */ }
+          onSearch(ctx.refined_query, undefined, ctx.market.toUpperCase(), ctx)
+        } catch { /* malformed */ }
       }
     } else if (signal.includes('<INVALID_QUERY>')) {
       const match = signal.match(/<INVALID_QUERY>([\s\S]*?)<\/INVALID_QUERY>/)
       let reason = t.miriam_invalid_query
       if (match) {
-        try {
-          const parsed = JSON.parse(match[1])
-          if (parsed.reason) reason = parsed.reason
-        } catch { /* use default */ }
+        try { const p = JSON.parse(match[1]); if (p.reason) reason = p.reason } catch { /* */ }
       }
       addMessage({ role: 'assistant', content: `⚠️ ${reason}` })
+    } else if (signal.includes('<SUPPLIERS>')) {
+      const match = signal.match(/<SUPPLIERS>([\s\S]*?)<\/SUPPLIERS>/)
+      if (match) {
+        try {
+          const payload = JSON.parse(match[1])
+          const q = payload.query || ''
+          const cards: SupplierCard[] = ((payload.platforms as string[]) || [])
+            .filter(p => SUPPLIER_URLS[p])
+            .map(p => ({
+              platform: p,
+              url: SUPPLIER_URLS[p](q),
+              description: PLATFORM_DESCRIPTIONS[p] || '',
+            }))
+          if (cards.length > 0) {
+            addMessage({ role: 'assistant', content: '', suppliers: cards })
+          }
+        } catch { /* malformed */ }
+      }
     }
   }, [onSearch, setContext, addMessage, t.miriam_invalid_query])
 
-  // silent=true means don't add a user bubble (used for CTA-triggered messages)
   const sendMessage = useCallback(async (text: string, silent = false) => {
     if (!text.trim() || isStreaming) return
     const userMsg = text.trim()
@@ -106,27 +150,17 @@ export default function MiriamChat({ onSearch }: Props) {
     try {
       for await (const chunk of streamMiriam(messages, userMsg)) {
         if (chunk.done) break
-        if (chunk.text) {
-          accumulated += chunk.text
-          setStreamingText(accumulated)
-        }
-        if (chunk.signal) {
-          signalAccumulated += chunk.signal
-        }
+        if (chunk.text) { accumulated += chunk.text; setStreamingText(accumulated) }
+        if (chunk.signal) { signalAccumulated += chunk.signal }
       }
     } catch {
       accumulated = 'Sorry, something went wrong. Please try again.'
     }
 
-    if (accumulated.trim()) {
-      addMessage({ role: 'assistant', content: accumulated.trim() })
-    }
+    if (accumulated.trim()) addMessage({ role: 'assistant', content: accumulated.trim() })
     setStreamingText('')
     setIsStreaming(false)
-
-    if (signalAccumulated) {
-      parseSignal(signalAccumulated)
-    }
+    if (signalAccumulated) parseSignal(signalAccumulated)
   }, [messages, isStreaming, addMessage, setIsStreaming, parseSignal])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -135,6 +169,10 @@ export default function MiriamChat({ onSearch }: Props) {
       sendMessage(input)
     }
   }
+
+  const handleClear = useCallback(() => {
+    reset()
+  }, [reset])
 
   const onDragStart = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -169,17 +207,35 @@ export default function MiriamChat({ onSearch }: Props) {
 
       {/* Header */}
       <div
-        className="flex items-center justify-between px-3 cursor-pointer select-none border-b border-border bg-muted/40 shrink-0"
+        className="flex items-center justify-between px-3 select-none border-b border-border bg-muted/40 shrink-0"
         style={{ height: HEADER_HEIGHT }}
-        onClick={() => setMinimized(!minimized)}
       >
-        <div className="flex items-center gap-2">
+        <div
+          className="flex items-center gap-2 flex-1 cursor-pointer"
+          onClick={() => setMinimized(!minimized)}
+        >
           <span className="text-sm font-semibold text-foreground">{t.miriam_title}</span>
-          {isStreaming && (
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-          )}
+          {isStreaming && <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
         </div>
-        <span className="text-muted-foreground text-xs">{minimized ? '▲' : '▼'}</span>
+        <div className="flex items-center gap-1">
+          {messages.length > 1 && !isStreaming && (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleClear() }}
+              title="Nuova chat"
+              className="p-1 rounded text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </button>
+          )}
+          <span
+            className="text-muted-foreground text-xs cursor-pointer px-1"
+            onClick={() => setMinimized(!minimized)}
+          >
+            {minimized ? '▲' : '▼'}
+          </span>
+        </div>
       </div>
 
       {/* Body */}
@@ -187,7 +243,7 @@ export default function MiriamChat({ onSearch }: Props) {
         <>
           <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3 min-h-0">
             {messages.map((msg, i) => (
-              <MessageBubble key={i} role={msg.role} content={msg.content} />
+              <MessageBubble key={i} role={msg.role} content={msg.content} suppliers={msg.suppliers} />
             ))}
             {streamingText && (
               <MessageBubble role="assistant" content={streamingText} streaming />
@@ -224,16 +280,45 @@ export default function MiriamChat({ onSearch }: Props) {
 }
 
 function MessageBubble({
-  role,
-  content,
-  streaming,
+  role, content, suppliers, streaming,
 }: {
   role: 'user' | 'assistant'
   content: string
+  suppliers?: SupplierCard[]
   streaming?: boolean
 }) {
   const isUser = role === 'user'
   const isWarning = !isUser && content.startsWith('⚠️')
+
+  if (suppliers && suppliers.length > 0) {
+    return (
+      <div className="flex justify-start">
+        <div className="w-full flex flex-col gap-1.5">
+          {suppliers.map((s) => (
+            <a
+              key={s.platform}
+              href={s.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-border bg-card hover:bg-muted/50 transition-colors group"
+            >
+              <span className="text-base shrink-0">{PLATFORM_ICONS[s.platform] ?? '🔗'}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{s.platform}</p>
+                <p className="text-xs text-muted-foreground truncate">{s.description}</p>
+              </div>
+              <svg className="w-3 h-3 text-muted-foreground/40 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+              </svg>
+            </a>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (!content) return null
+
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div

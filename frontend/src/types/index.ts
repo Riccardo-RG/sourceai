@@ -33,9 +33,16 @@ export interface SourcingLink {
   description: string
 }
 
+export interface SupplierCard {
+  platform: string
+  url: string
+  description: string
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
+  suppliers?: SupplierCard[]
 }
 
 export interface SearchContext {
