@@ -61,6 +61,7 @@ interface MarginStore {
   setInput: (key: keyof MarginInputs, value: number) => void
   setPlatform: (platform: string) => void
   hydrateScenarios: () => Promise<void>
+  resetScenarios: () => void
   saveScenario: (name: string, supplierName?: string) => Promise<void>
   loadScenario: (id: string) => void
   deleteScenario: (id: string) => Promise<void>
@@ -97,6 +98,8 @@ export const useMarginStore = create<MarginStore>((set, get) => ({
       set({ scenariosHydrated: true })
     }
   },
+
+  resetScenarios: () => set({ scenarios: [], scenariosHydrated: false }),
 
   saveScenario: async (name, supplierName) => {
     const { inputs, result } = get()

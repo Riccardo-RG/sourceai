@@ -7,6 +7,8 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { InfoTooltip } from '@/components/ui/info-tooltip'
 import { useMarginStore, PLATFORM_FEES_LIST } from '@/store/marginStore'
+import { useAuthStore } from '@/store/authStore'
+import { useT } from '@/hooks/useT'
 import { MarginInputs } from '@/types'
 import DropVsStock from './DropVsStock'
 
@@ -65,11 +67,18 @@ function MetricCard({ label, tooltip, abs, pct, showBar = false }: {
 }
 
 export default function MarginCalculator() {
-  const { inputs, result, selectedPlatform, setInput, setPlatform, saveScenario, scenarios, loadScenario, deleteScenario, hydrateScenarios } = useMarginStore()
+  const t = useT()
+  const { inputs, result, selectedPlatform, setInput, setPlatform, saveScenario, scenarios, loadScenario, deleteScenario, hydrateScenarios, resetScenarios } = useMarginStore()
+  const { user, initialized } = useAuthStore()
   const [scenarioName, setScenarioName] = useState('')
   const [showSave, setShowSave] = useState(false)
 
-  useEffect(() => { hydrateScenarios() }, [hydrateScenarios])
+  useEffect(() => {
+    if (!initialized) return
+    if (user) hydrateScenarios()
+    else resetScenarios()
+  }, [user, initialized, hydrateScenarios, resetScenarios])
+
   const f = (key: keyof MarginInputs) => (v: number) => setInput(key, v)
 
   return (
@@ -77,16 +86,16 @@ export default function MarginCalculator() {
       <div className="rounded-2xl border bg-card shadow-card overflow-hidden">
         <div className="px-6 py-5 border-b border-border/60">
           <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold">Margin Calculator</h3>
-            <InfoTooltip text="Calcola in tempo reale quanto guadagni per ogni unità venduta, tenendo conto di tutti i costi." />
+            <h3 className="text-lg font-semibold">{t.mc_title}</h3>
+            <InfoTooltip text={t.mc_title_tooltip} />
           </div>
         </div>
 
         <div className="p-6">
           <Tabs defaultValue="calculator">
             <TabsList className="w-full mb-6">
-              <TabsTrigger value="calculator" className="flex-1 text-base">Calcolatore</TabsTrigger>
-              <TabsTrigger value="dropvsstock" className="flex-1 text-base">Drop vs Stock</TabsTrigger>
+              <TabsTrigger value="calculator" className="flex-1 text-base">{t.mc_tab_calc}</TabsTrigger>
+              <TabsTrigger value="dropvsstock" className="flex-1 text-base">{t.mc_tab_drop}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="dropvsstock">
@@ -98,25 +107,25 @@ export default function MarginCalculator() {
 
                 {/* Output */}
                 <div className="grid grid-cols-2 gap-6 p-5 bg-muted/40 rounded-xl">
-                  <MetricCard label="Margine lordo" tooltip="Prezzo di vendita meno solo il costo del prodotto. Non include spedizione, fee o altri costi."
+                  <MetricCard label={t.mc_gross} tooltip={t.mc_gross_tooltip}
                     abs={result.gross_margin_abs} pct={result.gross_margin_pct} />
-                  <MetricCard label="Margine netto" tooltip="Quello che guadagni davvero per ogni unità, dopo tutti i costi: prodotto, spedizione, fee, ads e resi."
+                  <MetricCard label={t.mc_net} tooltip={t.mc_net_tooltip}
                     abs={result.net_margin_abs} pct={result.net_margin_pct} showBar />
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-1.5">
-                      <p className="metric-label">Costo totale/unità</p>
-                      <InfoTooltip text="Somma di tutti i costi per unità. Sottratto al prezzo di vendita dà il margine netto." />
+                      <p className="metric-label">{t.mc_total_cost}</p>
+                      <InfoTooltip text={t.mc_total_cost_tooltip} />
                     </div>
                     <p className="text-2xl font-bold tabular-nums">€{result.total_cost_per_unit.toFixed(2)}</p>
                   </div>
                   {result.breakeven_units !== null && (
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-1.5">
-                        <p className="metric-label">Break-even mensile</p>
-                        <InfoTooltip text="Quante unità devi vendere ogni mese per coprire i costi fissi mensili." />
+                        <p className="metric-label">{t.mc_breakeven}</p>
+                        <InfoTooltip text={t.mc_breakeven_tooltip} />
                       </div>
                       <p className="text-2xl font-bold tabular-nums">
-                        {result.breakeven_units} <span className="text-lg font-normal text-muted-foreground">unità</span>
+                        {result.breakeven_units} <span className="text-lg font-normal text-muted-foreground">{t.mc_breakeven_unit}</span>
                       </p>
                     </div>
                   )}
@@ -126,19 +135,19 @@ export default function MarginCalculator() {
 
                 {/* Inputs */}
                 <div className="grid grid-cols-2 gap-5">
-                  <NumberInput label="Prezzo di vendita" tooltip="Il prezzo a cui venderai il prodotto al cliente finale."
+                  <NumberInput label={t.mc_selling_price} tooltip={t.mc_selling_price_tooltip}
                     value={inputs.selling_price} onChange={f('selling_price')} prefix="€" step={0.5} min={0.01} />
-                  <NumberInput label="Costo unitario supplier" tooltip="Quanto paghi al supplier per ogni unità. Clicca 'Usa nel calcolatore' su una scheda supplier per precompilarlo."
+                  <NumberInput label={t.mc_unit_cost} tooltip={t.mc_unit_cost_tooltip}
                     value={inputs.unit_cost} onChange={f('unit_cost')} prefix="€" step={0.1} min={0.01} />
-                  <NumberInput label="Spedizione al cliente" tooltip="Costo medio di spedizione per unità. Se offri spedizione gratuita, inserisci il costo che paghi al corriere."
+                  <NumberInput label={t.mc_shipping} tooltip={t.mc_shipping_tooltip}
                     value={inputs.shipping_cost} onChange={f('shipping_cost')} prefix="€" step={0.5} />
-                  <NumberInput label="Costo ads per unità" tooltip="Spesa pubblicitaria media per unità. Es: €300 di ads su 100 unità = €3/unità."
+                  <NumberInput label={t.mc_ads} tooltip={t.mc_ads_tooltip}
                     value={inputs.ads_cost_per_unit} onChange={f('ads_cost_per_unit')} prefix="€" step={0.1} />
 
                   <div className="space-y-2">
                     <div className="flex items-center gap-1.5">
-                      <label className="text-base font-medium text-muted-foreground">Piattaforma</label>
-                      <InfoTooltip text="Seleziona la piattaforma per preimpostare la fee di transazione. Modificabile manualmente." />
+                      <label className="text-base font-medium text-muted-foreground">{t.mc_platform}</label>
+                      <InfoTooltip text={t.mc_platform_tooltip} />
                     </div>
                     <Tabs value={selectedPlatform} onValueChange={setPlatform} className="w-full">
                       <TabsList className="w-full h-11 grid grid-cols-3">
@@ -148,11 +157,13 @@ export default function MarginCalculator() {
                       </TabsList>
                     </Tabs>
                   </div>
-                  <NumberInput label={`Fee piattaforma (${selectedPlatform})`} tooltip="Percentuale trattenuta dalla piattaforma su ogni vendita. Shopify ~2%, Amazon ~15%."
+                  <NumberInput
+                    label={t.mc_platform_fee.replace('{platform}', selectedPlatform)}
+                    tooltip={t.mc_platform_fee_tooltip}
                     value={inputs.platform_fee_pct} onChange={f('platform_fee_pct')} suffix="%" step={0.1} />
-                  <NumberInput label="Tasso di reso" tooltip="Percentuale stimata di ordini restituiti. Tipicamente 1–5% per prodotti fisici."
+                  <NumberInput label={t.mc_return_rate} tooltip={t.mc_return_rate_tooltip}
                     value={inputs.return_rate_pct} onChange={f('return_rate_pct')} suffix="%" step={0.5} />
-                  <NumberInput label="Costi fissi mensili" tooltip="Costi mensili fissi (abbonamenti, magazzino, tool). Attiva il calcolo del break-even."
+                  <NumberInput label={t.mc_fixed_costs} tooltip={t.mc_fixed_costs_tooltip}
                     value={inputs.monthly_fixed_costs} onChange={f('monthly_fixed_costs')} prefix="€" step={10} />
                 </div>
 
@@ -162,21 +173,21 @@ export default function MarginCalculator() {
                 <div className="space-y-3">
                   {showSave ? (
                     <div className="flex gap-2">
-                      <Input placeholder="Nome scenario (es. Borraccia – Supplier A)" value={scenarioName}
+                      <Input placeholder={t.mc_save_placeholder} value={scenarioName}
                         onChange={(e) => setScenarioName(e.target.value)} className="h-11 text-base" />
                       <button onClick={() => { if (scenarioName.trim()) { saveScenario(scenarioName.trim()); setScenarioName(''); setShowSave(false) } }}
                         className="px-4 h-11 text-base bg-foreground text-background rounded-lg font-semibold hover:opacity-85 transition whitespace-nowrap">
-                        Salva
+                        {t.mc_save}
                       </button>
                       <button onClick={() => setShowSave(false)}
                         className="px-3 h-11 text-base text-muted-foreground hover:text-foreground transition rounded-lg">
-                        Annulla
+                        {t.mc_cancel}
                       </button>
                     </div>
                   ) : (
                     <button onClick={() => setShowSave(true)}
                       className="text-base text-muted-foreground hover:text-foreground transition underline underline-offset-4 decoration-border/60">
-                      + Salva scenario
+                      {t.mc_save_scenario}
                     </button>
                   )}
                 </div>
@@ -191,8 +202,8 @@ export default function MarginCalculator() {
         <div className="rounded-2xl border bg-card shadow-card overflow-hidden">
           <div className="px-6 py-5 border-b border-border/60">
             <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold">Scenari salvati</h3>
-              <InfoTooltip text="Salva più configurazioni di margine per confrontarle — stesso prodotto con supplier diversi o piattaforme diverse." />
+              <h3 className="text-lg font-semibold">{t.mc_saved_scenarios}</h3>
+              <InfoTooltip text={t.mc_saved_scenarios_tooltip} />
             </div>
           </div>
           <div className="divide-y divide-border/60">
@@ -201,13 +212,13 @@ export default function MarginCalculator() {
                 <div className="space-y-1">
                   <p className="text-base font-semibold">{s.name}</p>
                   <div className="flex gap-2">
-                    <Badge variant="secondary" className="text-base">Netto {s.result.net_margin_pct}%</Badge>
+                    <Badge variant="secondary" className="text-base">{t.mc_net_short} {s.result.net_margin_pct}%</Badge>
                     <Badge variant="secondary" className="text-base">€{s.result.net_margin_abs}/u</Badge>
                   </div>
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => loadScenario(s.id)} className="text-base text-muted-foreground hover:text-foreground transition">Carica</button>
-                  <button onClick={() => deleteScenario(s.id)} className="text-base text-red-400 hover:text-red-600 transition">Elimina</button>
+                  <button onClick={() => loadScenario(s.id)} className="text-base text-muted-foreground hover:text-foreground transition">{t.mc_load}</button>
+                  <button onClick={() => deleteScenario(s.id)} className="text-base text-red-400 hover:text-red-600 transition">{t.mc_delete}</button>
                 </div>
               </div>
             ))}

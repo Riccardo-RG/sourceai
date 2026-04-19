@@ -3,34 +3,42 @@
 import { useState, useEffect } from 'react'
 import { InfoTooltip } from '@/components/ui/info-tooltip'
 import { useOutreachStore, OutreachStatus } from '@/store/outreachStore'
-
-const STATUS_CONFIG: Record<OutreachStatus, { label: string; color: string }> = {
-  inviato:    { label: 'Inviato',    color: 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800' },
-  in_attesa:  { label: 'In attesa',  color: 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800' },
-  risposto:   { label: 'Risposto',   color: 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800' },
-  trattativa: { label: 'Trattativa', color: 'bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800' },
-  chiuso:     { label: 'Chiuso',     color: 'bg-muted text-muted-foreground border border-border' },
-}
-
-const STATUS_ORDER: OutreachStatus[] = ['inviato', 'in_attesa', 'risposto', 'trattativa', 'chiuso']
-
-function timeAgo(date: Date): string {
-  const diff = Date.now() - date.getTime()
-  const mins = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-  if (mins < 1) return 'ora'
-  if (mins < 60) return `${mins}m fa`
-  if (hours < 24) return `${hours}h fa`
-  return `${days}g fa`
-}
+import { useAuthStore } from '@/store/authStore'
+import { useT } from '@/hooks/useT'
 
 export default function OutreachTracker() {
-  const { entries, hydrate, updateStatus, addNote, removeEntry } = useOutreachStore()
+  const { entries, hydrate, reset, updateStatus, addNote, removeEntry } = useOutreachStore()
+  const { user, initialized } = useAuthStore()
+  const t = useT()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [noteInput, setNoteInput] = useState<Record<string, string>>({})
 
-  useEffect(() => { hydrate() }, [hydrate])
+  useEffect(() => {
+    if (!initialized) return
+    if (user) hydrate()
+    else reset()
+  }, [user, initialized, hydrate, reset])
+
+  const statusConfig: Record<OutreachStatus, { label: string; color: string }> = {
+    inviato:    { label: t.ot_status_sent,        color: 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800' },
+    in_attesa:  { label: t.ot_status_waiting,     color: 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800' },
+    risposto:   { label: t.ot_status_replied,     color: 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800' },
+    trattativa: { label: t.ot_status_negotiation, color: 'bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800' },
+    chiuso:     { label: t.ot_status_closed,      color: 'bg-muted text-muted-foreground border border-border' },
+  }
+
+  const STATUS_ORDER: OutreachStatus[] = ['inviato', 'in_attesa', 'risposto', 'trattativa', 'chiuso']
+
+  function timeAgo(date: Date): string {
+    const diff = Date.now() - date.getTime()
+    const mins = Math.floor(diff / 60000)
+    const hours = Math.floor(diff / 3600000)
+    const days = Math.floor(diff / 86400000)
+    if (mins < 1) return t.ot_just_now
+    if (mins < 60) return t.ot_mins_ago.replace('{n}', String(mins))
+    if (hours < 24) return t.ot_hours_ago.replace('{n}', String(hours))
+    return t.ot_days_ago.replace('{n}', String(days))
+  }
 
   if (entries.length === 0) return null
 
@@ -39,16 +47,18 @@ export default function OutreachTracker() {
       <div className="px-6 py-5 border-b border-border/60">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold">Outreach tracker</h3>
-            <InfoTooltip text="Tieni traccia dei supplier contattati. Aggiorna lo stato man mano che la trattativa avanza." />
+            <h3 className="text-lg font-semibold">{t.ot_title}</h3>
+            <InfoTooltip text={t.ot_title_tooltip} />
           </div>
-          <span className="text-base text-muted-foreground">{entries.length} contatti</span>
+          <span className="text-base text-muted-foreground">
+            {t.ot_contacts.replace('{n}', String(entries.length))}
+          </span>
         </div>
       </div>
 
       <div className="divide-y divide-border/60">
         {entries.map((entry) => {
-          const cfg = STATUS_CONFIG[entry.status]
+          const cfg = statusConfig[entry.status]
           const expanded = expandedId === entry.id
 
           return (
@@ -74,11 +84,11 @@ export default function OutreachTracker() {
               {expanded && (
                 <div className="px-6 pb-5 pt-3 space-y-4 bg-muted/20 border-t border-border/60">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <InfoTooltip text="Aggiorna lo stato: Inviato → In attesa → Risposto → Trattativa → Chiuso." />
+                    <InfoTooltip text={t.ot_status_tooltip} />
                     {STATUS_ORDER.map((s) => (
                       <button key={s} onClick={() => updateStatus(entry.id, s)}
                         className={`text-sm font-semibold px-3 py-1.5 rounded-full border transition ${entry.status === s ? cfg.color : 'text-muted-foreground hover:text-foreground border-border'}`}>
-                        {STATUS_CONFIG[s].label}
+                        {statusConfig[s].label}
                       </button>
                     ))}
                   </div>
@@ -88,22 +98,22 @@ export default function OutreachTracker() {
                   )}
 
                   <div className="flex gap-2">
-                    <input type="text" placeholder="Aggiungi una nota…"
+                    <input type="text" placeholder={t.ot_add_note}
                       value={noteInput[entry.id] ?? ''}
                       onChange={(e) => setNoteInput((p) => ({ ...p, [entry.id]: e.target.value }))}
                       className="flex-1 h-11 text-base px-3 border rounded-lg bg-card focus:outline-none focus:ring-2 focus:ring-foreground/10" />
                     <button onClick={() => { const n = noteInput[entry.id]?.trim(); if (n) { addNote(entry.id, n); setNoteInput((p) => ({ ...p, [entry.id]: '' })) } }}
                       className="h-11 px-4 text-base font-semibold bg-foreground text-background rounded-lg hover:opacity-85 transition">
-                      Salva
+                      {t.ot_save}
                     </button>
                     <button onClick={() => removeEntry(entry.id)}
                       className="h-11 px-3 text-base text-red-400 hover:text-red-600 transition rounded-lg">
-                      Rimuovi
+                      {t.ot_remove}
                     </button>
                   </div>
 
                   <p className="text-sm text-muted-foreground">
-                    Inviato {timeAgo(entry.sent_at)} · aggiornato {timeAgo(entry.last_update)}
+                    {t.ot_sent_prefix} {timeAgo(entry.sent_at)} · {t.ot_updated_prefix} {timeAgo(entry.last_update)}
                   </p>
                 </div>
               )}

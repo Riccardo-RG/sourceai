@@ -32,6 +32,7 @@ interface OutreachStore {
   entries: OutreachEntry[]
   hydrated: boolean
   hydrate: () => Promise<void>
+  reset: () => void
   addEntry: (supplier_id: string, supplier_name: string, product_query: string) => Promise<void>
   updateStatus: (id: string, status: OutreachStatus) => Promise<void>
   addNote: (id: string, note: string) => Promise<void>
@@ -51,6 +52,8 @@ export const useOutreachStore = create<OutreachStore>((set, get) => ({
       set({ hydrated: true })
     }
   },
+
+  reset: () => set({ entries: [], hydrated: false }),
 
   addEntry: async (supplier_id, supplier_name, product_query) => {
     const exists = get().entries.find(

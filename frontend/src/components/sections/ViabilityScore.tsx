@@ -1,6 +1,7 @@
 'use client'
 
 import { InfoTooltip } from '@/components/ui/info-tooltip'
+import { useT } from '@/hooks/useT'
 
 interface SubScore {
   label: string
@@ -26,15 +27,9 @@ interface ViabilityData {
   verdict: string
 }
 
-const SIGNAL_TOOLTIPS: Record<string, string> = {
-  'Range prezzi mercato': 'Prezzi rilevati su marketplace attivi. Utile per scegliere il tuo prezzo di vendita.',
-  'Canale consigliato': 'Piattaforme dove questo tipo di prodotto ottiene più trazione.',
-  'Trend annuale': "Variazione della domanda rispetto all'anno precedente.",
-}
-
-function ScoreRing({ score }: { score: number }) {
+function ScoreRing({ score, good, fair, risky }: { score: number; good: string; fair: string; risky: string }) {
   const color = score >= 70 ? '#10b981' : score >= 45 ? '#f59e0b' : '#ef4444'
-  const label = score >= 70 ? 'Buono' : score >= 45 ? 'Discreto' : 'Rischioso'
+  const label = score >= 70 ? good : score >= 45 ? fair : risky
   const r = 38
   const circ = 2 * Math.PI * r
   const dash = (score / 100) * circ
@@ -75,18 +70,25 @@ function SubScoreBar({ sub }: { sub: SubScore }) {
   )
 }
 
-export default function ViabilityScore({ data, query }: { data: object; query: string }) {
+export default function ViabilityScore({ data }: { data: object; query: string }) {
+  const t = useT()
   const d = data as ViabilityData
 
   const subScores: SubScore[] = [
-    { label: 'Domanda', value: d.demand, note: d.demand_note, tooltip: 'Misura quanto le persone cercano attivamente questo prodotto. Alto = mercato già attivo.' },
-    { label: 'Competizione', value: d.competition, note: d.competition_note, tooltip: 'Facilità di entrata nel mercato. 100 = mercato aperto, 0 = molto saturo.' },
-    { label: 'Margine potenziale', value: d.margin_potential, note: d.margin_note, tooltip: 'Indica se il prodotto è vendibile con margine sostenibile al netto dei costi.' },
-    { label: 'Facilità sourcing', value: d.sourcing_ease, note: d.sourcing_note, tooltip: 'Quanti supplier attivi esistono con MOQ e prezzi accessibili.' },
+    { label: t.vs_demand,      value: d.demand,          note: d.demand_note,      tooltip: t.vs_demand_tooltip },
+    { label: t.vs_competition, value: d.competition,     note: d.competition_note, tooltip: t.vs_competition_tooltip },
+    { label: t.vs_margin,      value: d.margin_potential, note: d.margin_note,      tooltip: t.vs_margin_tooltip },
+    { label: t.vs_sourcing,    value: d.sourcing_ease,   note: d.sourcing_note,    tooltip: t.vs_sourcing_tooltip },
   ]
 
   const trendSign = d.trend_yoy >= 0 ? '↑' : '↓'
   const trendStr = `${trendSign} ${Math.abs(d.trend_yoy).toFixed(0)}% YoY`
+
+  const signals = [
+    { label: t.vs_price_range, value: `${d.price_range_min} – ${d.price_range_max}`, tooltip: t.vs_price_range_tooltip },
+    { label: t.vs_channel,     value: d.recommended_channels.slice(0, 2).join(' · '),  tooltip: t.vs_channel_tooltip },
+    { label: t.vs_trend,       value: trendStr,                                        tooltip: t.vs_trend_tooltip },
+  ]
 
   return (
     <div className="rounded-2xl border bg-card shadow-card overflow-hidden">
@@ -94,12 +96,12 @@ export default function ViabilityScore({ data, query }: { data: object; query: s
 
         <div className="flex items-center gap-2">
           <h3 className="text-lg font-semibold">Viability Score</h3>
-          <InfoTooltip text="Punteggio 0–100 che combina domanda, competizione, margine potenziale e facilità di sourcing. Sopra 70 = vale la pena procedere." />
+          <InfoTooltip text={t.vs_title_tooltip} />
         </div>
 
         <div className="flex gap-8 items-start">
           <div className="shrink-0">
-            <ScoreRing score={d.score} />
+            <ScoreRing score={d.score} good={t.vs_good} fair={t.vs_fair} risky={t.vs_risky} />
           </div>
           <div className="flex-1 space-y-5">
             {subScores.map((s) => <SubScoreBar key={s.label} sub={s} />)}
@@ -112,15 +114,11 @@ export default function ViabilityScore({ data, query }: { data: object; query: s
       </div>
 
       <div className="grid grid-cols-3 border-t border-border/60">
-        {[
-          { label: 'Range prezzi mercato', value: `€${d.price_range_min} – €${d.price_range_max}` },
-          { label: 'Canale consigliato', value: d.recommended_channels.slice(0, 2).join(' · ') },
-          { label: 'Trend annuale', value: trendStr },
-        ].map((s, i) => (
+        {signals.map((s, i) => (
           <div key={s.label} className={`px-5 py-5 space-y-1.5 ${i < 2 ? 'border-r border-border/60' : ''}`}>
             <div className="flex items-center gap-1.5">
               <p className="text-sm text-muted-foreground font-medium">{s.label}</p>
-              <InfoTooltip text={SIGNAL_TOOLTIPS[s.label] ?? ''} />
+              <InfoTooltip text={s.tooltip} />
             </div>
             <p className="text-base font-semibold">{s.value}</p>
           </div>

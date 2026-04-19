@@ -26,23 +26,9 @@ export interface MarginScenario {
   created_at: Date
 }
 
-export type SupplierType = 'dropshipping' | 'stock' | 'both'
-
-export interface Supplier {
-  id: string
-  name: string
-  source: string
+export interface SourcingLink {
+  platform: string
   url: string
-  type: SupplierType
-  moq: number
-  price_min: number
-  price_max: number
-  shipping_days_min: number
-  shipping_days_max: number
-  certifications: string[]
-  score: number
-  verified: boolean
-  years_on_platform: number | null
-  response_rate: number
+  label: string
   description: string
 }

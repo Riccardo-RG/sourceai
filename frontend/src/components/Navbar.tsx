@@ -5,6 +5,15 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useTheme } from './ThemeProvider'
 import { useAuthStore } from '@/store/authStore'
+import { useLangStore } from '@/store/langStore'
+import { useT } from '@/hooks/useT'
+import type { Lang } from '@/lib/translations'
+
+const LANG_OPTIONS: { code: Lang; flag: string; label: string }[] = [
+  { code: 'en', flag: '🇬🇧', label: 'EN' },
+  { code: 'it', flag: '🇮🇹', label: 'IT' },
+  { code: 'es', flag: '🇪🇸', label: 'ES' },
+]
 
 function SunIcon() {
   return (
@@ -23,9 +32,54 @@ function MoonIcon() {
   )
 }
 
+function LangSwitcher() {
+  const { lang, setLang } = useLangStore()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const current = LANG_OPTIONS.find((o) => o.code === lang)!
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="h-9 px-2.5 flex items-center gap-1.5 rounded-xl border border-border/60 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/60 transition"
+      >
+        <span>{current.flag}</span>
+        <span>{current.label}</span>
+        <span className="text-xs opacity-50">▾</span>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-11 w-32 rounded-xl border border-border bg-card shadow-lg py-1 z-50">
+          {LANG_OPTIONS.map((opt) => (
+            <button
+              key={opt.code}
+              onClick={() => { setLang(opt.code); setOpen(false) }}
+              className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-muted/60 transition
+                ${lang === opt.code ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}
+            >
+              <span>{opt.flag}</span>
+              <span>{opt.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function AuthSection() {
   const router = useRouter()
   const { user, initialized, signOut } = useAuthStore()
+  const t = useT()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -37,12 +91,10 @@ function AuthSection() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  // Still loading — show placeholder to avoid layout shift
   if (!initialized) {
     return <div className="w-9 h-9 rounded-xl bg-muted animate-pulse" />
   }
 
-  // Not logged in — show Accedi + Registrati
   if (!user) {
     return (
       <div className="flex items-center gap-2">
@@ -50,19 +102,18 @@ function AuthSection() {
           href="/login"
           className="px-3.5 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition"
         >
-          Accedi
+          {t.nav_login}
         </Link>
         <Link
           href="/signup"
           className="px-3.5 py-1.5 rounded-xl bg-foreground text-background text-sm font-semibold hover:opacity-90 transition"
         >
-          Registrati
+          {t.nav_signup}
         </Link>
       </div>
     )
   }
 
-  // Logged in — avatar with dropdown
   const initials = user.email?.slice(0, 2).toUpperCase() ?? 'U'
 
   return (
@@ -70,7 +121,7 @@ function AuthSection() {
       <button
         onClick={() => setOpen((o) => !o)}
         className="w-9 h-9 rounded-xl bg-muted border border-border flex items-center justify-center text-sm font-semibold text-foreground hover:bg-muted/80 transition"
-        aria-label="Menu utente"
+        aria-label="User menu"
       >
         {initials}
       </button>
@@ -88,7 +139,7 @@ function AuthSection() {
             }}
             className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/60 transition"
           >
-            Esci
+            {t.nav_logout}
           </button>
         </div>
       )}
@@ -99,6 +150,7 @@ function AuthSection() {
 export default function Navbar() {
   const { theme, toggle } = useTheme()
   const { initialize, initialized } = useAuthStore()
+  const t = useT()
 
   useEffect(() => {
     if (!initialized) initialize()
@@ -127,11 +179,12 @@ export default function Navbar() {
         {/* Right */}
         <div className="flex items-center gap-3">
           <p className="text-base text-muted-foreground hidden sm:block">
-            AI Sourcing per seller online
+            {t.nav_tagline}
           </p>
+          <LangSwitcher />
           <button
             onClick={toggle}
-            aria-label="Cambia tema"
+            aria-label="Toggle theme"
             className="w-9 h-9 flex items-center justify-center rounded-xl border border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition"
           >
             {theme === 'dark' ? <SunIcon /> : <MoonIcon />}

@@ -1,206 +1,181 @@
 import asyncio
 import json
 import re
+import urllib.parse
 
 from app.config import settings
 from app.services.db_service import (
     _normalize_query,
     get_cached_search,
-    upsert_suppliers,
     save_search_cache,
     log_search,
 )
+from app.services.trends_service import MARKET_CONFIG
 
-SYSTEM_PROMPT = """Sei un esperto analista di sourcing per l'e-commerce europeo, specializzato nel mercato italiano.
-Analizza un prodotto e i risultati di ricerca web, poi restituisci un JSON strutturato.
+SYSTEM_PROMPT = """You are an international e-commerce analyst.
+You receive real research data (prices from the target Amazon marketplace, market articles, supplier availability).
+Produce a structured assessment BASED EXCLUSIVELY on the data received.
 
-Regole:
-- Tutti i prezzi in EUR
-- Tempi di spedizione verso Italia/UE
-- Punteggi sono interi 0-100
-- competition 100 = mercato aperto/facile, 0 = molto saturo
-- supplier score è float 0-5
-- verdict e note SEMPRE in italiano
-- Restituisci SOLO JSON valido, zero testo aggiuntivo
+CORE RULES:
+- Extract prices directly from Amazon search results — do not invent them
+- If data is missing for an aspect, say so explicitly in the note
+- Scores must reflect the data found, not random estimates
+- Notes must cite the source ("On Amazon.{tld} we found...", "From industry articles...")
+- competition 100 = open/easy market, 0 = very saturated
+- All monetary values in the market's local currency
+- Return ONLY valid JSON, zero additional text
 """
 
 USER_PROMPT = """\
-Analizza per un seller italiano e-commerce:
+Analyze for an e-commerce seller:
 
-**Prodotto:** {query}
-**Categoria:** {category}
+**Product:** {query}
+**Category:** {category}
+**Target market:** {market_name} ({market_code}) — currency: {currency}
 
-**Ricerca supplier (Alibaba/wholesale):**
-{supplier_results}
+**Google Trends data for {market_name} (REAL — use for demand and trend_yoy):**
+{trends_summary}
 
-**Ricerca mercato (domanda/trend):**
+**Prices and competitors on Amazon.{amazon_tld}:**
+{amazon_results}
+
+**Market trends and demand:**
 {market_results}
 
-Restituisci ESATTAMENTE questo JSON (nessun altro testo):
+**Supplier availability (Alibaba/wholesale):**
+{supplier_results}
+
+Return EXACTLY this JSON (no other text):
 {{
   "viability": {{
-    "score": <int 0-100>,
-    "demand": <int 0-100>,
-    "demand_note": "<1 frase in italiano>",
-    "competition": <int 0-100>,
-    "competition_note": "<1 frase in italiano>",
-    "margin_potential": <int 0-100>,
-    "margin_note": "<1 frase in italiano>",
-    "sourcing_ease": <int 0-100>,
-    "sourcing_note": "<1 frase in italiano>",
-    "price_range_min": <float EUR>,
-    "price_range_max": <float EUR>,
-    "recommended_channels": ["<canale1>", "<canale2>"],
-    "trend_yoy": <float percentuale es. 18.0>,
-    "verdict": "<2-3 frasi in italiano con consiglio concreto>"
-  }},
-  "suppliers": [
-    {{
-      "id": "<slug-univoco>",
-      "name": "<nome supplier>",
-      "source": "<Alibaba|AliExpress|Web>",
-      "url": "<url>",
-      "type": "<dropshipping|stock|both>",
-      "moq": <int>,
-      "price_min": <float EUR>,
-      "price_max": <float EUR>,
-      "shipping_days_min": <int>,
-      "shipping_days_max": <int>,
-      "certifications": ["CE"],
-      "score": <float 0-5>,
-      "verified": <bool>,
-      "years_on_platform": <int o null>,
-      "response_rate": <int 0-100>,
-      "description": "<1-2 frasi in italiano>"
-    }}
-  ]
+    "score": <int 0-100, weighted average of the other 4 scores>,
+    "demand": <int 0-100, use interest_avg from Google Trends if available, otherwise estimate>,
+    "demand_note": "<1-2 sentences citing Google Trends if available, e.g. 'Interest 68/100 on Google Trends {market_name}'>",
+    "competition": <int 0-100, based on number of competitors on Amazon.{amazon_tld}>,
+    "competition_note": "<1-2 sentences with real data found on Amazon.{amazon_tld}>",
+    "margin_potential": <int 0-100, based on real Amazon prices vs estimated sourcing costs>,
+    "margin_note": "<1-2 sentences with real price ranges found>",
+    "sourcing_ease": <int 0-100, based on supplier availability found>,
+    "sourcing_note": "<1-2 sentences on availability found>",
+    "price_range_min": <float {currency}, minimum real price found on Amazon.{amazon_tld}, 0 if not found>,
+    "price_range_max": <float {currency}, maximum real price found on Amazon.{amazon_tld}, 0 if not found>,
+    "recommended_channels": ["<channel1>", "<channel2>"],
+    "trend_yoy": <float percentage estimated from articles, 0 if not found>,
+    "verdict": "<2-3 concrete sentences based on the real data found>"
+  }}
 }}
-
-Includi 3-5 supplier reali o realistici. Prima i più affidabili per il mercato europeo.
 """
 
 
-def _mock_response(query: str) -> dict:
-    slug = re.sub(r"[^a-z0-9]+", "-", query.lower())[:24].strip("-")
-    short = query[:15]
-    return {
-        "viability": {
-            "score": 72,
-            "demand": 78,
-            "demand_note": "Interesse stabile con picchi stagionali negli ultimi 12 mesi.",
-            "competition": 60,
-            "competition_note": "Mercato competitivo ma con spazio per differenziarsi sul posizionamento.",
-            "margin_potential": 74,
-            "margin_note": "Margini buoni se il costo supplier è sotto il 35% del prezzo di vendita.",
-            "sourcing_ease": 80,
-            "sourcing_note": "Numerosi supplier verificati su Alibaba con MOQ accessibili.",
-            "price_range_min": 19.99,
-            "price_range_max": 49.99,
-            "recommended_channels": ["Shopify", "TikTok Shop", "Amazon"],
-            "trend_yoy": 18.0,
-            "verdict": (
-                f'"{query}" mostra buone prospettive per un seller early-stage. '
-                "Inizia con dropshipping per validare il mercato, "
-                "poi valuta lo stock una volta raggiunto un volume mensile stabile."
-            ),
+def _build_sourcing_links(query: str, market: str = "US") -> list[dict]:
+    q = urllib.parse.quote_plus(query)
+    conf = MARKET_CONFIG.get(market.upper(), MARKET_CONFIG["US"])
+    amazon_tld = conf.get("amazon_tld")
+    market_name = conf.get("name", market)
+
+    links = [
+        {
+            "platform": "Alibaba",
+            "url": f"https://www.alibaba.com/trade/search?SearchText={q}",
+            "label": "Search on Alibaba",
+            "description": "Manufacturers and wholesalers, negotiable MOQ",
         },
-        "suppliers": [
-            {
-                "id": f"{slug}-cn-001",
-                "name": f"Ningbo {short} Manufacturing Co.",
-                "source": "Alibaba",
-                "url": "https://www.alibaba.com",
-                "type": "both",
-                "moq": 50,
-                "price_min": 4.20,
-                "price_max": 6.80,
-                "shipping_days_min": 12,
-                "shipping_days_max": 18,
-                "certifications": ["CE", "RoHS"],
-                "score": 4.2,
-                "verified": True,
-                "years_on_platform": 7,
-                "response_rate": 94,
-                "description": "Produttore verificato con 7 anni di export verso UE. Disponibile sia per dropshipping che acquisto stock.",
-            },
-            {
-                "id": f"{slug}-cn-002",
-                "name": f"Shenzhen {short} Factory",
-                "source": "Alibaba",
-                "url": "https://www.alibaba.com",
-                "type": "dropshipping",
-                "moq": 1,
-                "price_min": 5.90,
-                "price_max": 8.50,
-                "shipping_days_min": 7,
-                "shipping_days_max": 14,
-                "certifications": ["CE"],
-                "score": 3.7,
-                "verified": True,
-                "years_on_platform": 3,
-                "response_rate": 88,
-                "description": "Specializzato in dropshipping con logistica EU-friendly. Nessun MOQ per ordini singoli.",
-            },
-            {
-                "id": f"{slug}-eu-001",
-                "name": f"EuroSource {short} Wholesale",
-                "source": "Web",
-                "url": "https://www.google.com",
-                "type": "stock",
-                "moq": 100,
-                "price_min": 7.50,
-                "price_max": 9.20,
-                "shipping_days_min": 2,
-                "shipping_days_max": 4,
-                "certifications": ["CE", "ISO 9001"],
-                "score": 4.6,
-                "verified": False,
-                "years_on_platform": None,
-                "response_rate": 79,
-                "description": "Grossista europeo con magazzino in Italia/Germania. Spedizioni rapide, ideale per chi acquista stock.",
-            },
-        ],
-    }
+        {
+            "platform": "AliExpress",
+            "url": f"https://www.aliexpress.com/wholesale?SearchText={q}",
+            "label": "Search on AliExpress",
+            "description": "Dropshipping with no minimum order",
+        },
+        {
+            "platform": "Made-in-China",
+            "url": f"https://www.made-in-china.com/multi-search/{q}/F1/",
+            "label": "Search on Made-in-China",
+            "description": "Verified Chinese manufacturers",
+        },
+        {
+            "platform": "Europages",
+            "url": f"https://www.europages.co.uk/companies/{q}.html",
+            "label": "Search on Europages",
+            "description": "European suppliers, fast EU shipping",
+        },
+    ]
+
+    if amazon_tld:
+        links.append({
+            "platform": f"Amazon {market_name}",
+            "url": f"https://www.amazon.{amazon_tld}/s?k={q}",
+            "label": f"Research on Amazon {market_name}",
+            "description": f"Competitor prices and demand signals on Amazon.{amazon_tld}",
+        })
+
+    return links
 
 
-async def _tavily_search(api_key: str, query: str) -> str:
+async def _tavily_search(api_key: str, query: str, max_results: int = 5) -> str:
     from tavily import AsyncTavilyClient
     client = AsyncTavilyClient(api_key=api_key)
     try:
-        result = await client.search(query, max_results=5, search_depth="basic")
+        result = await client.search(query, max_results=max_results, search_depth="basic")
         items = result.get("results", [])
         return "\n".join(
-            f"- {r.get('title', '')}: {r.get('content', '')[:400]}" for r in items
+            f"- {r.get('title', '')}: {r.get('content', '')[:500]}" for r in items
         )
     except Exception as e:
-        return f"[ricerca non disponibile: {e}]"
+        return f"[search unavailable: {e}]"
 
 
-async def _run_ai(query: str, category: str | None) -> dict:
-    """Run Tavily + Claude pipeline. Returns raw dict."""
-    supplier_text = "[nessuna ricerca web]"
-    market_text = "[nessuna ricerca web]"
+async def _run_ai(query: str, category: str | None, market: str = "US") -> dict:
+    from app.services.trends_service import get_trends_data
 
+    conf = MARKET_CONFIG.get(market.upper(), MARKET_CONFIG["US"])
+    amazon_tld = conf.get("amazon_tld", "com")
+    market_name = conf["name"]
+    currency = conf["currency"]
+
+    amazon_text = "[data unavailable]"
+    market_text = "[data unavailable]"
+    supplier_text = "[data unavailable]"
+    trends_data = None
+
+    tasks = [get_trends_data(query, market)]
     if settings.tavily_api_key:
-        supplier_text, market_text = await asyncio.gather(
+        tasks += [
             _tavily_search(
                 settings.tavily_api_key,
-                f"{query} supplier wholesale alibaba aliexpress prezzo dropshipping EUR",
+                f"{query} price buy amazon.{amazon_tld}",
+                max_results=7,
             ),
             _tavily_search(
                 settings.tavily_api_key,
-                f"{query} ecommerce domanda trend mercato italia shopify amazon 2024",
+                f"{query} ecommerce market {market_name} demand trend 2024 2025",
             ),
-        )
+            _tavily_search(
+                settings.tavily_api_key,
+                f"{query} wholesale supplier alibaba aliexpress price",
+            ),
+        ]
+        results = await asyncio.gather(*tasks)
+        trends_data = results[0]
+        amazon_text, market_text, supplier_text = results[1], results[2], results[3]
+    else:
+        trends_data = await get_trends_data(query, market)
+
+    trends_text = trends_data["summary"] if trends_data else "[Google Trends unavailable]"
 
     import anthropic
     client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
 
     prompt = USER_PROMPT.format(
         query=query,
-        category=category or "non specificata",
-        supplier_results=supplier_text[:3000],
-        market_results=market_text[:3000],
+        category=category or "unspecified",
+        market_name=market_name,
+        market_code=market.upper(),
+        currency=currency,
+        amazon_tld=amazon_tld,
+        trends_summary=trends_text,
+        amazon_results=amazon_text[:2500],
+        market_results=market_text[:2000],
+        supplier_results=supplier_text[:2000],
     )
 
     response = await client.messages.create(
@@ -215,40 +190,72 @@ async def _run_ai(query: str, category: str | None) -> dict:
     if match:
         raw = match.group(1)
 
-    return json.loads(raw)
+    data = json.loads(raw)
+    data["sourcing_links"] = _build_sourcing_links(query, market)
+
+    if trends_data:
+        data["viability"]["trend_yoy"] = trends_data["trend_yoy"]
+
+    return data
 
 
 async def analyze_product(
     query: str,
     category: str | None = None,
     session_id: str = "anonymous",
+    market: str = "US",
 ) -> dict:
-    normalized = _normalize_query(query)
+    normalized = _normalize_query(f"{query}_{market.upper()}")
 
     # ── 1. Cache check ────────────────────────────────────────────────────────
     cached = await asyncio.to_thread(get_cached_search, normalized)
     if cached:
-        # Log hit in background, don't wait
         asyncio.ensure_future(asyncio.to_thread(log_search, query, category, session_id, True))
+        cached["sourcing_links"] = _build_sourcing_links(query, market)
         return cached
 
     # ── 2. AI pipeline ────────────────────────────────────────────────────────
     if not settings.anthropic_api_key:
-        data = _mock_response(query)
+        data = _mock_response(query, market)
     else:
         try:
-            data = await _run_ai(query, category)
-        except Exception:
-            data = _mock_response(query)
+            data = await _run_ai(query, category, market)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error("AI pipeline failed: %s", e)
+            data = _mock_response(query, market)
 
-    # ── 3. Persist: upsert suppliers → save cache + log (parallel) ───────────
+    # ── 3. Persist ────────────────────────────────────────────────────────────
     try:
-        supplier_ids = await asyncio.to_thread(upsert_suppliers, data["suppliers"])
         await asyncio.gather(
-            asyncio.to_thread(save_search_cache, normalized, category, data["viability"], supplier_ids),
+            asyncio.to_thread(
+                save_search_cache, normalized, category, data["viability"], []
+            ),
             asyncio.to_thread(log_search, query, category, session_id, False),
         )
     except Exception:
-        pass  # Persistence failure must never break the search response
+        pass
 
     return data
+
+
+def _mock_response(query: str, market: str = "US") -> dict:
+    return {
+        "viability": {
+            "score": 0,
+            "demand": 0,
+            "demand_note": "Data unavailable — ANTHROPIC_API_KEY not configured.",
+            "competition": 0,
+            "competition_note": "Data unavailable.",
+            "margin_potential": 0,
+            "margin_note": "Data unavailable.",
+            "sourcing_ease": 0,
+            "sourcing_note": "Data unavailable.",
+            "price_range_min": 0,
+            "price_range_max": 0,
+            "recommended_channels": [],
+            "trend_yoy": 0,
+            "verdict": "Analysis unavailable: configure ANTHROPIC_API_KEY to enable AI search.",
+        },
+        "sourcing_links": _build_sourcing_links(query, market),
+    }

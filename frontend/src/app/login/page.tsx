@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/store/authStore'
+import { useT } from '@/hooks/useT'
 import { createClient } from '@/lib/supabase'
 
 function GoogleIcon() {
@@ -20,6 +21,7 @@ function GoogleIcon() {
 export default function LoginPage() {
   const router = useRouter()
   const { signIn, signInWithGoogle, loading } = useAuthStore()
+  const t = useT()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -49,8 +51,8 @@ export default function LoginPage() {
             </svg>
           </div>
           <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight">Accedi a SourceAI</h1>
-            <p className="text-sm text-muted-foreground mt-1">Bentornato</p>
+            <h1 className="text-2xl font-bold tracking-tight">{t.auth_login_title}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{t.auth_login_subtitle}</p>
           </div>
         </div>
 
@@ -62,12 +64,12 @@ export default function LoginPage() {
             className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl border border-border bg-background hover:bg-muted/60 transition text-sm font-medium"
           >
             <GoogleIcon />
-            Continua con Google
+            {t.auth_continue_google}
           </button>
 
           <div className="flex items-center gap-3">
             <div className="h-px flex-1 bg-border" />
-            <span className="text-xs text-muted-foreground">oppure</span>
+            <span className="text-xs text-muted-foreground">{t.auth_or}</span>
             <div className="h-px flex-1 bg-border" />
           </div>
 
@@ -83,7 +85,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20 transition"
-                placeholder="tu@esempio.com"
+                placeholder={t.auth_email_placeholder}
               />
             </div>
             <div className="space-y-1.5">
@@ -92,7 +94,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={async () => {
-                    if (!email) { setError('Inserisci prima la tua email'); return }
+                    if (!email) { setError(t.auth_enter_email); return }
                     const sb = createClient()
                     await sb.auth.resetPasswordForEmail(email, {
                       redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
@@ -101,7 +103,7 @@ export default function LoginPage() {
                   }}
                   className="text-xs text-muted-foreground hover:text-foreground transition"
                 >
-                  Password dimenticata?
+                  {t.auth_forgot}
                 </button>
               </div>
               <input
@@ -117,22 +119,22 @@ export default function LoginPage() {
             </div>
 
             {error && <p className="text-sm text-red-500 dark:text-red-400">{error}</p>}
-            {resetSent && <p className="text-sm text-green-600 dark:text-green-400">Email inviata! Controlla la tua casella.</p>}
+            {resetSent && <p className="text-sm text-green-600 dark:text-green-400">{t.auth_reset_sent}</p>}
 
             <button
               type="submit"
               disabled={loading}
               className="w-full py-2.5 rounded-xl bg-foreground text-background text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition"
             >
-              {loading ? 'Accesso…' : 'Accedi'}
+              {loading ? t.auth_loading_login : t.auth_submit_login}
             </button>
           </form>
         </div>
 
         <p className="text-center text-sm text-muted-foreground">
-          Non hai un account?{' '}
+          {t.auth_no_account}{' '}
           <Link href="/signup" className="font-semibold text-foreground hover:underline">
-            Registrati
+            {t.auth_signup_link}
           </Link>
         </p>
       </div>

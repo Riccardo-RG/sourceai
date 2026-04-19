@@ -44,12 +44,15 @@ export async function getUserId(): Promise<string> {
 
 // ── Search ───────────────────────────────────────────────────────────────────
 
-export async function searchProduct(query: string, category?: string) {
+export async function searchProduct(query: string, category?: string, market = 'US'): Promise<{
+  viability: object
+  sourcing_links: Array<{ platform: string; url: string; label: string; description: string }>
+}> {
   const userId = await getUserId()
   const res = await fetch(`${API_URL}/api/search`, {
     method: 'POST',
     headers: await authHeaders(),
-    body: JSON.stringify({ query, category, session_id: userId }),
+    body: JSON.stringify({ query, category, session_id: userId, market }),
   })
   if (!res.ok) throw new Error(`Search failed: ${res.status}`)
   return res.json()
