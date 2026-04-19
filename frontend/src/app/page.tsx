@@ -153,6 +153,8 @@ export default function Home() {
                   {/* ViabilityScore commentato — score numerico da ridisegnare (basato su recensioni supplier) */}
                   {/* <ViabilityScore data={viabilityData} query={query} /> */}
 
+                  <TrendsCard data={viabilityData} />
+
                   <div className="flex flex-col gap-3">
                     {/* Miriam advice CTA */}
                     <button
@@ -230,6 +232,40 @@ export default function Home() {
       {/* Saved suppliers panel — fixed bottom-left, hidden when empty */}
       <SavedSuppliers />
     </>
+  )
+}
+
+function TrendsCard({ data }: { data: Record<string, unknown> | null }) {
+  const interest = typeof data?.trends_interest === 'number' ? data.trends_interest : null
+  const trendYoy = typeof data?.trend_yoy === 'number' ? data.trend_yoy : null
+  const market = typeof data?.trends_market === 'string' ? data.trends_market : null
+  const peak = typeof data?.trends_peak === 'string' && data.trends_peak ? data.trends_peak : null
+
+  if (interest === null || market === null) return null
+
+  const direction = trendYoy !== null && trendYoy > 5 ? '↑' : trendYoy !== null && trendYoy < -5 ? '↓' : '→'
+  const dirColor = trendYoy !== null && trendYoy > 5
+    ? 'text-emerald-600 dark:text-emerald-400'
+    : trendYoy !== null && trendYoy < -5
+      ? 'text-red-500 dark:text-red-400'
+      : 'text-muted-foreground'
+
+  return (
+    <div className="flex items-center gap-3 flex-wrap px-4 py-3 rounded-xl border border-border bg-muted/30 w-fit">
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-full">
+        ✅ Google Trends
+      </span>
+      <span className="text-sm font-semibold text-foreground">{market}</span>
+      <span className="text-sm text-muted-foreground">Interest <span className="font-semibold text-foreground">{interest}/100</span></span>
+      {trendYoy !== null && (
+        <span className={`text-sm font-medium ${dirColor}`}>
+          {direction} {trendYoy > 0 ? '+' : ''}{trendYoy.toFixed(0)}% YoY
+        </span>
+      )}
+      {peak && (
+        <span className="text-xs text-muted-foreground/70">Peak: {peak}</span>
+      )}
+    </div>
   )
 }
 

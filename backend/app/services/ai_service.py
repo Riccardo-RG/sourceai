@@ -176,14 +176,49 @@ SUPPLIER_PLATFORMS = {
     ],
 }
 
+# Extra platform added when market context is known (appended after positioning links)
+MARKET_EXTRA_PLATFORMS: dict[str, dict] = {
+    "EUROPE": {
+        "platform": "Ankorstore",
+        "url": "https://www.ankorstore.com/search?query={q}",
+        "label": "Search on Ankorstore",
+        "description": "European brands and artisans, quick EU delivery",
+    },
+    "LATAM": {
+        "platform": "Mercado Libre",
+        "url": "https://listado.mercadolibre.com.mx/search?as_word={q}",
+        "label": "Search on Mercado Libre",
+        "description": "Latin America's largest marketplace — demand + local competitors",
+    },
+    "ASIA_PACIFIC": {
+        "platform": "Made-in-China",
+        "url": "https://www.made-in-china.com/multi-search/{q}/F1/",
+        "label": "Search on Made-in-China",
+        "description": "Verified Chinese manufacturers, Asia-Pacific shipping",
+    },
+    "MIDDLE_EAST": {
+        "platform": "DHgate",
+        "url": "https://www.dhgate.com/wholesale/search.do?searchkey={q}",
+        "label": "Search on DHgate",
+        "description": "Small-batch wholesale, ships to Middle East",
+    },
+    "NORTH_AMERICA": {
+        "platform": "Spocket",
+        "url": "https://www.spocket.co/products?search={q}",
+        "label": "Search on Spocket",
+        "description": "US/EU suppliers, fast North America shipping",
+    },
+}
+
 
 def _build_sourcing_links(
     query: str,
-    market: str = "US",
+    market: str = "GLOBAL",
     positioning: str = "unknown",
 ) -> list[dict]:
     q = urllib.parse.quote_plus(query)
-    conf = MARKET_CONFIG.get(market.upper(), MARKET_CONFIG["GLOBAL"])
+    market_upper = market.upper()
+    conf = MARKET_CONFIG.get(market_upper, MARKET_CONFIG["GLOBAL"])
     amazon_tld = conf.get("amazon_tld")
     market_name = conf.get("name", market)
 
@@ -199,6 +234,18 @@ def _build_sourcing_links(
         }
         for t in platform_templates
     ]
+
+    # Add market-specific extra platform (skip if already in the list)
+    extra = MARKET_EXTRA_PLATFORMS.get(market_upper)
+    if extra:
+        already = {lnk["platform"] for lnk in links}
+        if extra["platform"] not in already:
+            links.append({
+                "platform": extra["platform"],
+                "url": extra["url"].format(q=q),
+                "label": extra["label"],
+                "description": extra["description"],
+            })
 
     if amazon_tld:
         links.append({
@@ -330,6 +377,9 @@ async def _run_ai(
 
     if trends_data:
         data["viability"]["trend_yoy"] = trends_data["trend_yoy"]
+        data["viability"]["trends_interest"] = trends_data["interest_avg"]
+        data["viability"]["trends_peak"] = trends_data["peak_month"]
+        data["viability"]["trends_market"] = trends_data["market_name"]
 
     return data
 
