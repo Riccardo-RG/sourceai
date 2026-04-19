@@ -277,15 +277,38 @@ def _detect_local_market(query: str, supplier_context: str) -> str | None:
     text = (query + " " + supplier_context).lower()
     if any(w in text for w in ("italia", "italian", "made in italy", "italiano")):
         return "Italy"
-    if any(w in text for w in ("france", "french", "français", "Francia")):
+    if any(w in text for w in ("france", "french", "français", "francia")):
         return "France"
-    if any(w in text for w in ("spain", "spain", "españa", "Spanish")):
+    if any(w in text for w in ("spain", "españa", "español", "spanish")):
         return "Spain"
-    if any(w in text for w in ("germany", "deutsch", "german", "Germania")):
+    if any(w in text for w in ("germany", "deutsch", "german", "germania")):
         return "Germany"
     if any(w in text for w in ("uk", "britain", "british", "england")):
         return "UK"
     return None
+
+
+# Search keywords localized per language code
+_WEB_SEARCH_TERMS: dict[str, dict[str, str]] = {
+    "it": {"supplier": "produttore fornitore", "artisanal": "artigianale ingrosso", "wholesale": "fornitore ingrosso", "drop": "dropshipping fornitore"},
+    "es": {"supplier": "fabricante proveedor", "artisanal": "artesanal mayorista", "wholesale": "proveedor mayorista", "drop": "dropshipping proveedor"},
+    "fr": {"supplier": "fabricant fournisseur", "artisanal": "artisanal grossiste", "wholesale": "fournisseur grossiste", "drop": "dropshipping fournisseur"},
+    "de": {"supplier": "Hersteller Lieferant", "artisanal": "handwerklich Großhandel", "wholesale": "Lieferant Großhandel", "drop": "Dropshipping Lieferant"},
+    "pt": {"supplier": "fabricante fornecedor", "artisanal": "artesanal atacado", "wholesale": "fornecedor atacado", "drop": "dropshipping fornecedor"},
+    "ja": {"supplier": "メーカー サプライヤー", "artisanal": "職人 卸売", "wholesale": "卸売 サプライヤー", "drop": "ドロップシッピング"},
+    "en": {"supplier": "manufacturer supplier", "artisanal": "artisanal wholesale", "wholesale": "supplier wholesale", "drop": "dropshipping supplier"},
+}
+
+
+def _web_search_terms(market: str, local_market: str | None) -> dict[str, str]:
+    """Return localized Tavily keyword dict for the given market."""
+    from app.services.trends_service import MARKET_CONFIG
+    conf = MARKET_CONFIG.get(market.upper(), MARKET_CONFIG["GLOBAL"])
+    lang = conf.get("language_code", "en")
+    # Force English for UK regardless of language_code
+    if local_market == "UK":
+        lang = "en"
+    return _WEB_SEARCH_TERMS.get(lang, _WEB_SEARCH_TERMS["en"])
 
 
 async def _search_real_suppliers(
@@ -328,16 +351,16 @@ async def _search_real_suppliers(
         platform_sq = f"site:alibaba.com {query} supplier manufacturer"
 
     # ── Open web query ───────────────────────────────────────────────────────
-    # Use local market name when detected, otherwise fall back to market config.
     market_conf = MARKET_CONFIG.get(market_upper, MARKET_CONFIG["GLOBAL"])
     geo = local_market or market_conf.get("name", market)
     ctx_hint = f" {supplier_context}" if supplier_context else ""
+    terms = _web_search_terms(market_upper, local_market)
     if positioning in ("artisanal", "premium"):
-        web_sq = f"{query} produttore fornitore artigianale ingrosso {geo}{ctx_hint}"
+        web_sq = f"{query} {terms['artisanal']} {geo}{ctx_hint}"
     elif positioning == "dropshipping":
-        web_sq = f"{query} dropshipping supplier wholesale {geo}"
+        web_sq = f"{query} {terms['drop']} {geo}"
     else:
-        web_sq = f"{query} supplier wholesale manufacturer B2B {geo}"
+        web_sq = f"{query} {terms['wholesale']} manufacturer B2B {geo}"
 
     # ── Run both searches in parallel ────────────────────────────────────────
     try:
@@ -457,10 +480,11 @@ async def _run_ai(
     tasks = [get_trends_data(query, market)]
     real_suppliers: list[dict] = []
     if settings.tavily_api_key:
+        _mkt_terms = _web_search_terms(market.upper(), None)
         tasks += [
             _tavily_search(
                 settings.tavily_api_key,
-                f"{query} price buy amazon.{amazon_tld}",
+                f"{query} {_mkt_terms['supplier']} amazon.{amazon_tld} price",
                 max_results=7,
             ),
             _tavily_search(
