@@ -183,7 +183,7 @@ def _build_sourcing_links(
     positioning: str = "unknown",
 ) -> list[dict]:
     q = urllib.parse.quote_plus(query)
-    conf = MARKET_CONFIG.get(market.upper(), MARKET_CONFIG["US"])
+    conf = MARKET_CONFIG.get(market.upper(), MARKET_CONFIG["GLOBAL"])
     amazon_tld = conf.get("amazon_tld")
     market_name = conf.get("name", market)
 
@@ -237,7 +237,7 @@ async def _run_ai(
     channel = (context or {}).get("channel", "online")
     target_customer = (context or {}).get("target_customer", "")
 
-    conf = MARKET_CONFIG.get(market.upper(), MARKET_CONFIG["US"])
+    conf = MARKET_CONFIG.get(market.upper(), MARKET_CONFIG["GLOBAL"])
     amazon_tld = conf.get("amazon_tld", "com")
     market_name = conf["name"]
     currency = conf["currency"]

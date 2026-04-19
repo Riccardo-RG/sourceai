@@ -5,23 +5,12 @@ import { Badge } from '@/components/ui/badge'
 import { useT } from '@/hooks/useT'
 
 const MARKETS = [
-  { code: 'US', flag: '🇺🇸', label: 'USA' },
-  { code: 'GB', flag: '🇬🇧', label: 'UK' },
-  { code: 'DE', flag: '🇩🇪', label: 'Germany' },
-  { code: 'FR', flag: '🇫🇷', label: 'France' },
-  { code: 'IT', flag: '🇮🇹', label: 'Italy' },
-  { code: 'ES', flag: '🇪🇸', label: 'Spain' },
-  { code: 'JP', flag: '🇯🇵', label: 'Japan' },
-  { code: 'AU', flag: '🇦🇺', label: 'Australia' },
-  { code: 'CA', flag: '🇨🇦', label: 'Canada' },
-  { code: 'BR', flag: '🇧🇷', label: 'Brazil' },
-  { code: 'MX', flag: '🇲🇽', label: 'Mexico' },
-  { code: 'NL', flag: '🇳🇱', label: 'Netherlands' },
-  { code: 'SE', flag: '🇸🇪', label: 'Sweden' },
-  { code: 'PL', flag: '🇵🇱', label: 'Poland' },
-  { code: 'IN', flag: '🇮🇳', label: 'India' },
-  { code: 'AE', flag: '🇦🇪', label: 'UAE' },
-  { code: 'TR', flag: '🇹🇷', label: 'Turkey' },
+  { code: 'GLOBAL',        flag: '🌍', label: 'Global'         },
+  { code: 'EUROPE',        flag: '🇪🇺', label: 'Europe'         },
+  { code: 'NORTH_AMERICA', flag: '🌎', label: 'North America'  },
+  { code: 'LATAM',         flag: '🌎', label: 'Latin America'  },
+  { code: 'ASIA_PACIFIC',  flag: '🌏', label: 'Asia Pacific'   },
+  { code: 'MIDDLE_EAST',   flag: '🌍', label: 'Middle East'    },
 ]
 
 interface ProductInputProps {
@@ -33,7 +22,7 @@ export default function ProductInput({ onSearch, isLoading }: ProductInputProps)
   const t = useT()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<string | undefined>()
-  const [market, setMarket] = useState('US')
+  const [market, setMarket] = useState('GLOBAL')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -57,9 +46,7 @@ export default function ProductInput({ onSearch, isLoading }: ProductInputProps)
                 disabled:opacity-55 appearance-none cursor-pointer"
             >
               {MARKETS.map((m) => (
-                <option key={m.code} value={m.code}>
-                  {m.flag} {m.label}
-                </option>
+                <option key={m.code} value={m.code}>{m.flag} {m.label}</option>
               ))}
             </select>
             <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">▾</span>

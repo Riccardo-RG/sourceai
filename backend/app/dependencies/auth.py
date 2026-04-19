@@ -1,7 +1,21 @@
+import base64
+import json
 import logging
 from fastapi import Header, HTTPException
 
 logger = logging.getLogger(__name__)
+
+
+def _jwt_sub(token: str) -> str | None:
+    """Extract sub claim from JWT payload without verifying signature."""
+    try:
+        payload_b64 = token.split(".")[1]
+        # Add padding
+        payload_b64 += "=" * (-len(payload_b64) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        return payload.get("sub")
+    except Exception:
+        return None
 
 
 async def get_user_id(
@@ -15,6 +29,12 @@ async def get_user_id(
             sb = get_supabase()
             response = sb.auth.get_user(token)
             return str(response.user.id)
+        except RuntimeError:
+            # Supabase not configured — extract sub from JWT payload (unverified)
+            logger.warning("Supabase not configured, extracting sub from JWT unverified")
+            sub = _jwt_sub(token)
+            if sub:
+                return sub
         except Exception as e:
             logger.error("Token verification failed: %s", e)
             raise HTTPException(status_code=401, detail=f"Token non valido: {e}")

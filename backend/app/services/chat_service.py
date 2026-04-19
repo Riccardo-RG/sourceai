@@ -17,7 +17,7 @@ RULES:
 
 QUESTIONS TO ASK (pick based on what's still missing, in order of priority):
 1. What is the exact product? (if the query is vague or too generic)
-2. Where do they want to sell? (market/country — only if not clear from context)
+2. Where do they want to sell? (region: Global / Europe / North America / Latin America / Asia Pacific / Middle East — only if not clear from context)
 3. What is their positioning? (premium/quality vs low price/volume vs artisanal/niche vs dropshipping)
 4. Who is their target customer? (only if it would meaningfully change the supplier strategy)
 
@@ -32,7 +32,7 @@ INVALID QUERY SIGNAL:
 
 SIGNAL FORMAT (emit at the END of your message, after your text):
 For a valid search ready to launch:
-<SEARCH_READY>{"refined_query": "...", "positioning": "mass_market|artisanal|premium|dropshipping|unknown", "market": "global|US|IT|DE|...", "channel": "online|store|dropshipping", "target_customer": "...", "supplier_context": "..."}</SEARCH_READY>
+<SEARCH_READY>{"refined_query": "...", "positioning": "mass_market|artisanal|premium|dropshipping|unknown", "market": "GLOBAL|EUROPE|NORTH_AMERICA|LATAM|ASIA_PACIFIC|MIDDLE_EAST", "channel": "online|store|dropshipping", "target_customer": "...", "supplier_context": "..."}</SEARCH_READY>
 
 For an invalid/unsearchable query:
 <INVALID_QUERY>{"reason": "..."}</INVALID_QUERY>
