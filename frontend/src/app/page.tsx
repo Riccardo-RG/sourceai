@@ -40,7 +40,7 @@ export default function Home() {
   const [sourcingLinks, setSourcingLinks] = useState<SourcingLink[]>([])
   const [realSuppliers, setRealSuppliers] = useState<RealSupplier[]>([])
 
-  const { context, triggerAdvice, isStreaming, setMinimized, setFoundSuppliers, setViabilitySummary } = useMiriamStore()
+  const { context, setMinimized, setFoundSuppliers, setViabilitySummary } = useMiriamStore()
   const { setInput: setMarginInput, setPrefillNote } = useMarginStore()
 
   const handleSearch = async (q: string, category?: string, market = 'GLOBAL', ctx?: SearchContext) => {
@@ -99,12 +99,11 @@ export default function Home() {
     }
   }
 
-  const [verdictOpen, setVerdictOpen] = useState(true)
+  const [verdictOpen, setVerdictOpen] = useState(false)
 
   const handleAdviceCta = useCallback(() => {
-    if (!viabilityData) return
-    triggerAdvice(query, viabilityData)
-  }, [viabilityData, query, triggerAdvice])
+    setMinimized(false)
+  }, [setMinimized])
 
   const isLoading = step === 'validating' || step === 'sourcing'
   const isRateLimited = step === 'rate_limited'
@@ -208,8 +207,7 @@ export default function Home() {
                     {/* Miriam advice CTA */}
                     <button
                       onClick={handleAdviceCta}
-                      disabled={isStreaming}
-                      className="inline-flex items-center gap-2.5 px-3.5 py-2 rounded-md border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors disabled:opacity-50 w-fit"
+                      className="inline-flex items-center gap-2.5 px-3.5 py-2 rounded-md border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors w-fit"
                     >
                       <span className="text-primary text-xs leading-none">✦</span>
                       <div className="text-left">
