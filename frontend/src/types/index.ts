@@ -60,3 +60,21 @@ export interface SearchContext {
   target_customer: string
   supplier_context: string
 }
+
+export interface SearchOptionsChoice {
+  value: string
+  label: string
+  desc?: string
+}
+
+export interface SearchOptionsGroup {
+  id: string
+  label: string
+  choices: SearchOptionsChoice[]
+}
+
+export interface SearchOptions {
+  intro: string
+  refined_query: string
+  groups: SearchOptionsGroup[]
+}

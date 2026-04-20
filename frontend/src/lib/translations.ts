@@ -235,6 +235,10 @@ export interface T {
   miriam_generic_cta: string       // "ask Miriam" link in the hint
   miriam_context_hint: string      // shown when search WAS guided by Miriam (invite to refine)
   miriam_context_refine: string    // "ask Miriam to refine" link
+
+  // MiriamOptionsPanel
+  options_cancel: string
+  options_confirm: string
 }
 
 const en: T = {
@@ -472,6 +476,9 @@ const en: T = {
   miriam_generic_cta: 'ask Miriam',
   miriam_context_hint: 'Suppliers filtered based on your search context. Want to change something?',
   miriam_context_refine: 'Ask Miriam to refine',
+
+  options_cancel: 'Cancel',
+  options_confirm: 'Analyze product',
 }
 
 const it: T = {
@@ -709,6 +716,9 @@ const it: T = {
   miriam_generic_cta: 'chiedi a Miriam',
   miriam_context_hint: 'Fornitori filtrati in base al contesto della tua ricerca. Vuoi cambiare qualcosa?',
   miriam_context_refine: 'Chiedi a Miriam di raffinare',
+
+  options_cancel: 'Annulla',
+  options_confirm: 'Analizza prodotto',
 }
 
 const es: T = {
@@ -946,6 +956,9 @@ const es: T = {
   miriam_generic_cta: 'pregunta a Miriam',
   miriam_context_hint: 'Proveedores filtrados según el contexto de tu búsqueda. ¿Quieres cambiar algo?',
   miriam_context_refine: 'Pide a Miriam que afine',
+
+  options_cancel: 'Cancelar',
+  options_confirm: 'Analizar producto',
 }
 
 export const translations: Record<Lang, T> = { en, it, es }

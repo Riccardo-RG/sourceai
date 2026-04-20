@@ -8,15 +8,16 @@ import SourcingLinks from '@/components/sections/SourcingLinks'
 import RealSuppliers from '@/components/sections/RealSuppliers'
 import OutreachTracker from '@/components/sections/OutreachTracker'
 import MiriamChat from '@/components/sections/MiriamChat'
+import MiriamOptionsPanel from '@/components/sections/MiriamOptionsPanel'
 import SavedSuppliers from '@/components/sections/SavedSuppliers'
-import { searchProduct } from '@/lib/api'
+import { searchProduct, clarifyQuery } from '@/lib/api'
 import { useT } from '@/hooks/useT'
 import { useLangStore } from '@/store/langStore'
 import { useMiriamStore } from '@/store/miriamStore'
 import { useMarginStore } from '@/store/marginStore'
-import { SourcingLink, SearchContext, RealSupplier } from '@/types'
+import { SourcingLink, SearchContext, RealSupplier, SearchOptions } from '@/types'
 
-type Step = 'idle' | 'validating' | 'sourcing' | 'done' | 'error' | 'rate_limited'
+type Step = 'idle' | 'asking' | 'validating' | 'sourcing' | 'done' | 'error' | 'rate_limited'
 
 
 export default function Home() {
@@ -29,12 +30,34 @@ export default function Home() {
   const [sourcingLinks, setSourcingLinks] = useState<SourcingLink[]>([])
   const [realSuppliers, setRealSuppliers] = useState<RealSupplier[]>([])
 
-  const { context, setMinimized, setFoundSuppliers, setViabilitySummary } = useMiriamStore()
+  const { context, setMinimized, setContext, setFoundSuppliers, setViabilitySummary } = useMiriamStore()
+  const [searchOptions, setSearchOptions] = useState<SearchOptions | null>(null)
+  const [optionsLoading, setOptionsLoading] = useState(false)
   const { setInput: setMarginInput, setPrefillNote } = useMarginStore()
 
+  // Called from ProductInput — shows options panel before launching search
+  const handleAnalyze = async (q: string, _category?: string, market = 'GLOBAL') => {
+    setQuery(q)
+    setCurrentMarket(market)
+    setStep('asking')
+    setSearchOptions(null)
+    setOptionsLoading(true)
+    try {
+      const opts = await clarifyQuery(q, lang)
+      setSearchOptions(opts)
+    } catch {
+      // API failed — fall back to direct search with no context
+      handleSearch(q, undefined, market)
+    } finally {
+      setOptionsLoading(false)
+    }
+  }
+
+  // Called when user confirms options, or directly from MiriamChat SEARCH_READY signal
   const handleSearch = async (q: string, category?: string, market = 'GLOBAL', ctx?: SearchContext) => {
     setQuery(q)
     setCurrentMarket(market)
+    if (ctx) setContext(ctx)
     setStep('validating')
 
     const timer = setTimeout(
@@ -88,6 +111,10 @@ export default function Home() {
     }
   }
 
+  const handleConfirmOptions = useCallback((refinedQuery: string, market: string, ctx: SearchContext) => {
+    handleSearch(refinedQuery, undefined, market, ctx)
+  }, []) // eslint-disable-line
+
   const [verdictOpen, setVerdictOpen] = useState(false)
 
   const handleAdviceCta = useCallback(() => {
@@ -120,13 +147,26 @@ export default function Home() {
                   {t.hero_subtitle}
                 </p>
               </div>
-              <ProductInput onSearch={handleSearch} isLoading={isLoading} />
+              <ProductInput onSearch={handleAnalyze} isLoading={isLoading} />
             </div>
           </div>
         </section>
 
         {/* ── Results ──────────────────────────── */}
         <div className="max-w-5xl mx-auto px-6 py-10 space-y-12">
+
+          {/* Options panel (Miriam clarify) */}
+          {step === 'asking' && (
+            <section className="animate-in fade-in slide-in-from-bottom-3 duration-400">
+              <MiriamOptionsPanel
+                options={searchOptions}
+                loading={optionsLoading}
+                initialMarket={currentMarket}
+                onConfirm={handleConfirmOptions}
+                onCancel={() => setStep('idle')}
+              />
+            </section>
+          )}
 
           {/* Error */}
           {step === 'error' && (
@@ -178,7 +218,7 @@ export default function Home() {
           )}
 
           {/* Step 01 */}
-          {step !== 'idle' && step !== 'error' && step !== 'rate_limited' && (
+          {step !== 'idle' && step !== 'asking' && step !== 'error' && step !== 'rate_limited' && (
             <section className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
               <StepHeader number="01" label={t.step_01}
                 isLoading={step === 'validating'} loadingText={t.step_loading.replace('{query}', query)} />
@@ -243,8 +283,8 @@ export default function Home() {
             </section>
           )}
 
-          {/* How it works — idle */}
-          {step === 'idle' && (
+          {/* How it works — idle only */}
+          {(step === 'idle') && (
             <section className="animate-in fade-in duration-500">
               <p className="text-[10px] font-semibold tracking-widest text-muted-foreground/50 uppercase mb-6">
                 {t.how_title}

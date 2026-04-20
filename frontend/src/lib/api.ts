@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase'
-import type { ChatMessage } from '@/types'
+import type { ChatMessage, SearchOptions } from '@/types'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
@@ -41,6 +41,18 @@ export async function getUserId(): Promise<string> {
     if (user) return user.id
   } catch { /* fallthrough */ }
   return getSessionId()
+}
+
+// ── Clarify (pre-search options panel) ──────────────────────────────────────
+
+export async function clarifyQuery(query: string, lang = 'en'): Promise<SearchOptions> {
+  const res = await fetch(`${API_URL}/api/clarify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, lang }),
+  })
+  if (!res.ok) throw new Error(`Clarify failed: ${res.status}`)
+  return res.json()
 }
 
 // ── Search ───────────────────────────────────────────────────────────────────

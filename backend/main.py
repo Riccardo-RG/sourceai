@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import margin, search, outreach, scenarios, chat
+from app.routers import margin, search, outreach, scenarios, chat, clarify
 
 app = FastAPI(title="SourceAI API", version="1.0.0", redirect_slashes=False)
 
@@ -19,6 +19,7 @@ app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(outreach.router, prefix="/api/outreach", tags=["outreach"])
 app.include_router(scenarios.router, prefix="/api/scenarios", tags=["scenarios"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+app.include_router(clarify.router, prefix="/api/clarify", tags=["clarify"])
 
 
 @app.get("/health")
