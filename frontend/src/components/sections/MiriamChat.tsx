@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useMiriamStore } from '@/store/miriamStore'
-import { streamMiriam } from '@/lib/api'
+import { streamMiriam, clarifyQuery } from '@/lib/api'
 import { useT } from '@/hooks/useT'
-import type { SearchContext, SupplierCard } from '@/types'
+import { useLangStore } from '@/store/langStore'
+import MiriamOptionsPanel from '@/components/sections/MiriamOptionsPanel'
+import type { SearchContext, SupplierCard, SearchOptions } from '@/types'
 
 interface Props {
   onSearch: (query: string, category?: string, market?: string, context?: SearchContext) => void
@@ -59,8 +61,11 @@ export default function MiriamChat({ onSearch }: Props) {
     setIsStreaming, clearPendingAdvice, reset,
   } = useMiriamStore()
 
+  const lang = useLangStore((s) => s.lang)
   const [input, setInput] = useState('')
   const [streamingText, setStreamingText] = useState('')
+  const [pendingOptions, setPendingOptions] = useState<SearchOptions | null>(null)
+  const [optionsLoading, setOptionsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ startY: number; startH: number } | null>(null)
   const hasWelcomed = useRef(false)
@@ -141,12 +146,33 @@ export default function MiriamChat({ onSearch }: Props) {
     const userMsg = text.trim()
     setInput('')
     if (!silent) addMessage({ role: 'user', content: userMsg })
+
+    // Pre-search: no context yet → show options panel instead of text Q&A
+    if (context === null) {
+      setOptionsLoading(true)
+      setPendingOptions(null)
+      setHeight(Math.max(height, 520))
+      setMinimized(false)
+      try {
+        const opts = await clarifyQuery(userMsg, lang)
+        setPendingOptions(opts)
+      } catch {
+        // Fallback: normal chat flow
+        await runChatStream(userMsg)
+      } finally {
+        setOptionsLoading(false)
+      }
+      return
+    }
+
+    await runChatStream(userMsg)
+  }, [messages, isStreaming, context, lang, height, addMessage, setIsStreaming, setHeight, setMinimized, parseSignal]) // eslint-disable-line
+
+  const runChatStream = useCallback(async (userMsg: string) => {
     setIsStreaming(true)
     setStreamingText('')
-
     let accumulated = ''
     let signalAccumulated = ''
-
     try {
       for await (const chunk of streamMiriam(messages, userMsg, foundSuppliers, context, viabilitySummary)) {
         if (chunk.done) break
@@ -156,12 +182,11 @@ export default function MiriamChat({ onSearch }: Props) {
     } catch {
       accumulated = 'Sorry, something went wrong. Please try again.'
     }
-
     if (accumulated.trim()) addMessage({ role: 'assistant', content: accumulated.trim() })
     setStreamingText('')
     setIsStreaming(false)
     if (signalAccumulated) parseSignal(signalAccumulated)
-  }, [messages, isStreaming, addMessage, setIsStreaming, parseSignal])
+  }, [messages, foundSuppliers, context, viabilitySummary, addMessage, setIsStreaming, parseSignal])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -172,6 +197,7 @@ export default function MiriamChat({ onSearch }: Props) {
 
   const handleClear = useCallback(() => {
     reset()
+    setPendingOptions(null)
   }, [reset])
 
   const onDragStart = (e: React.MouseEvent) => {
@@ -248,8 +274,23 @@ export default function MiriamChat({ onSearch }: Props) {
             {streamingText && (
               <MessageBubble role="assistant" content={streamingText} streaming />
             )}
-            {isStreaming && !streamingText && (
+            {isStreaming && !streamingText && !optionsLoading && (
               <p className="text-[11px] text-muted-foreground/60 italic">{t.miriam_typing}</p>
+            )}
+            {/* Options panel — shown inline when pre-search clarification is needed */}
+            {(pendingOptions || optionsLoading) && (
+              <div className="mt-1">
+                <MiriamOptionsPanel
+                  options={pendingOptions}
+                  loading={optionsLoading}
+                  onConfirm={(refinedQuery, market, ctx) => {
+                    setPendingOptions(null)
+                    setContext(ctx)
+                    onSearch(refinedQuery, undefined, market, ctx)
+                  }}
+                  onCancel={() => setPendingOptions(null)}
+                />
+              </div>
             )}
             <div ref={messagesEndRef} />
           </div>
@@ -261,13 +302,13 @@ export default function MiriamChat({ onSearch }: Props) {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={t.miriam_placeholder}
-              disabled={isStreaming}
-              className="flex-1 resize-none text-xs bg-transparent outline-none placeholder:text-muted-foreground/50 text-foreground min-h-[24px] max-h-16"
+              disabled={isStreaming || optionsLoading || !!pendingOptions}
+              className="flex-1 resize-none text-xs bg-transparent outline-none placeholder:text-muted-foreground/50 text-foreground min-h-[24px] max-h-16 disabled:opacity-40"
               style={{ fieldSizing: 'content' } as React.CSSProperties}
             />
             <button
               onClick={() => sendMessage(input)}
-              disabled={isStreaming || !input.trim()}
+              disabled={isStreaming || !input.trim() || optionsLoading || !!pendingOptions}
               className="text-[10px] font-semibold px-2.5 py-1.5 rounded bg-primary text-primary-foreground disabled:opacity-30 hover:bg-primary/90 transition-colors shrink-0"
             >
               {t.miriam_send}
