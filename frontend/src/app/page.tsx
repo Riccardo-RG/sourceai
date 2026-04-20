@@ -147,7 +147,12 @@ export default function Home() {
                   {t.hero_subtitle}
                 </p>
               </div>
-              <ProductInput onSearch={handleAnalyze} isLoading={isLoading} />
+              <ProductInput
+                onSearch={handleAnalyze}
+                onMarketChange={setCurrentMarket}
+                market={currentMarket}
+                isLoading={isLoading}
+              />
             </div>
           </div>
         </section>

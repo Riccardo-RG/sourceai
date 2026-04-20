@@ -15,13 +15,21 @@ const MARKETS = [
 
 interface ProductInputProps {
   onSearch: (query: string, category?: string, market?: string) => void
+  onMarketChange?: (market: string) => void
   isLoading: boolean
+  market?: string
 }
 
-export default function ProductInput({ onSearch, isLoading }: ProductInputProps) {
+export default function ProductInput({ onSearch, onMarketChange, isLoading, market: controlledMarket }: ProductInputProps) {
   const t = useT()
   const [query, setQuery] = useState('')
-  const [market, setMarket] = useState('GLOBAL')
+  const [internalMarket, setInternalMarket] = useState('GLOBAL')
+
+  const market = controlledMarket ?? internalMarket
+  const setMarket = (m: string) => {
+    setInternalMarket(m)
+    onMarketChange?.(m)
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
