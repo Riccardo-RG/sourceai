@@ -313,6 +313,19 @@ export default function Home() {
         </div>
       </main>
 
+      {/* Footer */}
+      <footer className="border-t border-border/40 mt-8 py-5 px-6">
+        <div className="max-w-5xl mx-auto flex items-center justify-between flex-wrap gap-3">
+          <p className="text-[10px] text-muted-foreground/40">
+            © {new Date().getFullYear()} SourceAI — AI Sourcing Platform
+          </p>
+          <div className="flex items-center gap-4">
+            <a href="/privacy" className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors">Privacy Policy</a>
+            <a href="/terms" className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors">Terms of Use</a>
+          </div>
+        </div>
+      </footer>
+
       {/* Miriam chat panel — fixed bottom-right */}
       <MiriamChat onSearch={handleSearch} />
 
@@ -342,6 +355,13 @@ function LoadingSteps() {
   )
 }
 
+const SCORE_SOURCE: Record<string, { label: string; dot: string; text: string }> = {
+  demand:          { label: 'Google Trends', dot: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-400' },
+  competition:     { label: 'AI estimate',   dot: 'bg-muted-foreground/40', text: 'text-muted-foreground/60' },
+  margin_potential:{ label: 'Amazon + AI',   dot: 'bg-amber-400',  text: 'text-amber-600 dark:text-amber-400' },
+  sourcing_ease:   { label: 'AI estimate',   dot: 'bg-muted-foreground/40', text: 'text-muted-foreground/60' },
+}
+
 function ScoresRow({ data }: { data: Record<string, unknown> | null }) {
   const t = useT()
   if (!data) return null
@@ -367,6 +387,7 @@ function ScoresRow({ data }: { data: Record<string, unknown> | null }) {
             ? 'text-amber-600 dark:text-amber-400'
             : 'text-red-500 dark:text-red-400'
         const barColor = goodVal >= 65 ? 'bg-emerald-500' : goodVal >= 40 ? 'bg-amber-400' : 'bg-red-400'
+        const src = SCORE_SOURCE[key]
         return (
           <div key={key} className="p-4 bg-background space-y-2.5">
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">{label}</p>
@@ -377,6 +398,12 @@ function ScoresRow({ data }: { data: Record<string, unknown> | null }) {
             <div className="h-0.5 w-full bg-muted overflow-hidden">
               <div className={`h-full ${barColor} transition-all duration-700`} style={{ width: `${raw}%` }} />
             </div>
+            {src && (
+              <span className={`inline-flex items-center gap-1 text-[9px] font-medium ${src.text}`}>
+                <span className={`w-1 h-1 rounded-full shrink-0 ${src.dot}`} />
+                {src.label}
+              </span>
+            )}
           </div>
         )
       })}
@@ -397,10 +424,11 @@ function TrendsCard({ data }: { data: Record<string, unknown> | null }) {
     : trendYoy !== null && trendYoy < -5 ? 'text-red-500 dark:text-red-400' : 'text-muted-foreground'
 
   return (
-    <div className="inline-flex items-center gap-2.5 px-3 py-2 rounded-md border border-border bg-card text-xs">
-      <span className="font-medium text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+    <div className="inline-flex items-center gap-2.5 px-3 py-2 rounded-md border border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/50 dark:bg-emerald-950/20 text-xs">
+      <span className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
         Google Trends
+        <span className="text-[9px] font-bold tracking-wider text-emerald-600/70 dark:text-emerald-500/70 uppercase">live</span>
       </span>
       <span className="text-muted-foreground/40">·</span>
       <span className="font-medium text-foreground">{market}</span>
