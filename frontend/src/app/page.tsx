@@ -34,7 +34,7 @@ export default function Home() {
     const thread = s.threads.find((t) => t.id === s.activeThreadId)
     return thread?.context ?? null
   })
-  const { setMinimized, setContext, setFoundSuppliers, setViabilitySummary } = useMiriamStore()
+  const { setMinimized, setContext, setFoundSuppliers, setViabilitySummary, triggerAdvice } = useMiriamStore()
   const [searchOptions, setSearchOptions] = useState<SearchOptions | null>(null)
   const [optionsLoading, setOptionsLoading] = useState(false)
   const { setInput: setMarginInput, setPrefillNote } = useMarginStore()
@@ -122,8 +122,12 @@ export default function Home() {
   const [verdictOpen, setVerdictOpen] = useState(false)
 
   const handleAdviceCta = useCallback(() => {
-    setMinimized(false)
-  }, [setMinimized])
+    if (viabilityData && query) {
+      triggerAdvice(query, viabilityData as Record<string, unknown>)
+    } else {
+      setMinimized(false)
+    }
+  }, [triggerAdvice, setMinimized, viabilityData, query])
 
   const isLoading = step === 'validating' || step === 'sourcing'
   const isRateLimited = step === 'rate_limited'
@@ -269,8 +273,8 @@ export default function Home() {
               {step === 'sourcing' && <SkeletonLinks />}
               {step === 'done' && (
                 <>
-                  <SourcingLinks links={sourcingLinks} query={query} />
                   <RealSuppliers suppliers={realSuppliers} query={query} market={currentMarket} />
+                  <SourcingLinks links={sourcingLinks} query={query} />
                 </>
               )}
             </section>

@@ -6,14 +6,14 @@ import { useOutreachStore } from '@/store/outreachStore'
 import { useT } from '@/hooks/useT'
 
 const PLATFORM_COLORS: Record<string, string> = {
-  'Alibaba': 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-300 dark:border-orange-800',
-  'Europages': 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800',
-  'Made-in-China': 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-800',
-  'Ankorstore': 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-800',
-  'Faire': 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800',
-  'Global Sources': 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:border-sky-800',
-  'Spocket': 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-300 dark:border-violet-800',
-  'Web': 'bg-muted text-muted-foreground border-border',
+  'Alibaba':       'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  'Europages':     'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
+  'Made-in-China': 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+  'Ankorstore':    'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+  'Faire':         'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  'Global Sources':'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
+  'Spocket':       'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  'Web':           'bg-muted text-muted-foreground',
 }
 
 interface Props {
@@ -29,28 +29,24 @@ export default function RealSuppliers({ suppliers, query, market = 'Global' }: P
     return (
       <div className="flex items-center gap-2 px-4 py-3 rounded-md border border-dashed border-border text-xs text-muted-foreground">
         <span className="text-muted-foreground/40">○</span>
-        <span>
-          {t.rs_no_suppliers}{' '}
-          <span className="font-medium text-foreground">{t.rs_refine}</span>
-          {' '}→
-        </span>
+        <span>{t.rs_no_suppliers} <span className="font-medium text-foreground">{t.rs_refine}</span> →</span>
       </div>
     )
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
+    <div className="space-y-2.5">
+      <div className="flex items-center gap-2.5">
         <span className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-widest">
           {t.rs_found.replace('{n}', String(suppliers.length))}
         </span>
         <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 dark:text-amber-400">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+          <span className="w-1 h-1 rounded-full bg-amber-400" />
           {t.rs_indicative}
         </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
         {suppliers.map((s, i) => (
           <SupplierCard key={i} supplier={s} query={query} market={market} />
         ))}
@@ -66,89 +62,92 @@ function SupplierCard({ supplier: s, query, market }: { supplier: RealSupplier; 
   const [emailCopied, setEmailCopied] = useState(false)
 
   const badgeClass = PLATFORM_COLORS[s.platform] ?? PLATFORM_COLORS['Web']
-
-  const isAlreadyTracked = entries.some(
-    (e) => e.supplier_id === s.url && e.product_query === query,
-  )
+  const isTracked = entries.some((e) => e.supplier_id === s.url && e.product_query === query)
 
   const handleOutreach = async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (isAlreadyTracked || outreachDone) return
+    e.preventDefault(); e.stopPropagation()
+    if (isTracked || outreachDone) return
     await addEntry(s.url, s.name, query)
     setOutreachDone(true)
     setTimeout(() => setOutreachDone(false), 3000)
   }
 
   const handleEmail = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    const template = buildEmailTemplate(s.name, query, market)
-    navigator.clipboard.writeText(template).then(() => {
+    e.preventDefault(); e.stopPropagation()
+    navigator.clipboard.writeText(buildEmailTemplate(s.name, query, market)).then(() => {
       setEmailCopied(true)
       setTimeout(() => setEmailCopied(false), 2500)
     })
   }
 
   return (
-    <div className="flex flex-col gap-2.5 p-3.5 rounded-md border border-border bg-background hover:border-primary/30 transition-colors duration-150">
-      {/* Platform badge + external link */}
-      <div className="flex items-center justify-between gap-2">
-        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${badgeClass}`}>
-          {s.platform}
-        </span>
+    <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-md border border-border bg-card hover:border-primary/40 hover:bg-muted/20 transition-colors group">
+      {/* Name + platform */}
+      <div className="flex-1 min-w-0">
         <a
           href={s.url}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="text-muted-foreground/30 hover:text-primary transition-colors"
-          title={t.rs_open_site}
-        >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
-          </svg>
-        </a>
-      </div>
-
-      {/* Name + description */}
-      <div className="min-w-0">
-        <a
-          href={s.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm font-semibold text-foreground hover:text-primary transition-colors leading-snug line-clamp-1 block"
+          className="block text-sm font-bold text-foreground hover:text-primary transition-colors truncate leading-tight"
+          title={s.name}
         >
           {s.name}
         </a>
-        {s.description && (
-          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 mt-0.5">
-            {s.description}
-          </p>
-        )}
+        <span className={`inline-block mt-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded ${badgeClass}`}>
+          {s.platform}
+        </span>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-1.5 pt-1.5 border-t border-border/40">
+      {/* Icon actions */}
+      <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Outreach tracker */}
         <button
           onClick={handleOutreach}
-          disabled={isAlreadyTracked || outreachDone}
-          className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded border transition-colors disabled:cursor-default
-            ${isAlreadyTracked || outreachDone
-              ? 'text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30'
-              : 'text-muted-foreground border-border hover:text-primary hover:border-primary/40 hover:bg-primary/5'}`}
+          disabled={isTracked || outreachDone}
+          title={isTracked || outreachDone ? t.rs_tracked : t.rs_outreach_add}
+          className={`p-1.5 rounded transition-colors ${
+            isTracked || outreachDone
+              ? 'text-emerald-600 dark:text-emerald-400'
+              : 'text-muted-foreground/40 hover:text-primary hover:bg-primary/10'
+          }`}
         >
-          {isAlreadyTracked || outreachDone ? t.rs_tracked : t.rs_outreach_add}
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            {isTracked || outreachDone
+              ? <path d="M20 6L9 17l-5-5" />
+              : <path d="M12 5v14M5 12h14" />
+            }
+          </svg>
         </button>
+        {/* Copy email */}
         <button
           onClick={handleEmail}
-          className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded border transition-colors
-            ${emailCopied
-              ? 'text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30'
-              : 'text-muted-foreground border-border hover:text-primary hover:border-primary/40 hover:bg-primary/5'}`}
+          title={emailCopied ? t.rs_copied : t.rs_email}
+          className={`p-1.5 rounded transition-colors ${
+            emailCopied
+              ? 'text-emerald-600 dark:text-emerald-400'
+              : 'text-muted-foreground/40 hover:text-primary hover:bg-primary/10'
+          }`}
         >
-          {emailCopied ? t.rs_copied : t.rs_email}
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            {emailCopied
+              ? <path d="M20 6L9 17l-5-5" />
+              : <><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M2 7l10 7 10-7" /></>
+            }
+          </svg>
         </button>
+        {/* Open link */}
+        <a
+          href={s.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={t.rs_open_site}
+          className="p-1.5 rounded text-muted-foreground/40 hover:text-primary hover:bg-primary/10 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+          </svg>
+        </a>
       </div>
     </div>
   )

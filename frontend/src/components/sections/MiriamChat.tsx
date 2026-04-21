@@ -324,8 +324,16 @@ export default function MiriamChat({ onSearch }: Props) {
   return (
     <div
       ref={panelRef}
-      style={{ height: panelH, width, ...posStyle }}
-      className="fixed z-50 flex flex-col rounded-lg border border-border bg-background shadow-2xl"
+      style={{
+        height: panelH,
+        width,
+        ...posStyle,
+        ...(isStreaming && {
+          borderColor: 'var(--color-primary)',
+          boxShadow: '0 0 0 1px var(--color-primary), 0 8px 40px -8px var(--color-primary)',
+        }),
+      }}
+      className="fixed z-50 flex flex-col rounded-lg border border-border bg-background shadow-2xl transition-[box-shadow,border-color] duration-300"
     >
       {/* Top resize handle */}
       {!minimized && (
