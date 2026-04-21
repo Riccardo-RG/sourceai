@@ -30,7 +30,11 @@ export default function Home() {
   const [sourcingLinks, setSourcingLinks] = useState<SourcingLink[]>([])
   const [realSuppliers, setRealSuppliers] = useState<RealSupplier[]>([])
 
-  const { context, setMinimized, setContext, setFoundSuppliers, setViabilitySummary } = useMiriamStore()
+  const context = useMiriamStore((s) => {
+    const thread = s.threads.find((t) => t.id === s.activeThreadId)
+    return thread?.context ?? null
+  })
+  const { setMinimized, setContext, setFoundSuppliers, setViabilitySummary } = useMiriamStore()
   const [searchOptions, setSearchOptions] = useState<SearchOptions | null>(null)
   const [optionsLoading, setOptionsLoading] = useState(false)
   const { setInput: setMarginInput, setPrefillNote } = useMarginStore()

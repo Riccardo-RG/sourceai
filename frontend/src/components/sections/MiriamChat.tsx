@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useMiriamStore } from '@/store/miriamStore'
 import { streamMiriam, clarifyQuery } from '@/lib/api'
 import { useT } from '@/hooks/useT'
@@ -13,17 +13,21 @@ interface Props {
 }
 
 const HEADER_HEIGHT = 44
+const MIN_WIDTH = 260
+const MAX_WIDTH = 720
+const MIN_HEIGHT = 200
+const MAX_HEIGHT = 900
 
 const SUPPLIER_URLS: Record<string, (q: string) => string> = {
-  'Alibaba':       q => `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(q)}`,
-  'AliExpress':    q => `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(q)}`,
-  'Europages':     q => `https://www.europages.co.uk/companies/${encodeURIComponent(q)}.html`,
-  'Ankorstore':    q => `https://www.ankorstore.com/search?query=${encodeURIComponent(q)}`,
-  'Faire':         q => `https://www.faire.com/search?q=${encodeURIComponent(q)}`,
-  'DHgate':        q => `https://www.dhgate.com/wholesale/search.do?searchkey=${encodeURIComponent(q)}`,
-  'Made-in-China': q => `https://www.made-in-china.com/multi-search/${encodeURIComponent(q)}/F1/`,
-  'Spocket':       q => `https://www.spocket.co/products?search=${encodeURIComponent(q)}`,
-  'Mercado Libre': q => `https://listado.mercadolibre.com.mx/search?as_word=${encodeURIComponent(q)}`,
+  'Alibaba':       (q) => `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(q)}`,
+  'AliExpress':    (q) => `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(q)}`,
+  'Europages':     (q) => `https://www.europages.co.uk/companies/${encodeURIComponent(q)}.html`,
+  'Ankorstore':    (q) => `https://www.ankorstore.com/search?query=${encodeURIComponent(q)}`,
+  'Faire':         (q) => `https://www.faire.com/search?q=${encodeURIComponent(q)}`,
+  'DHgate':        (q) => `https://www.dhgate.com/wholesale/search.do?searchkey=${encodeURIComponent(q)}`,
+  'Made-in-China': (q) => `https://www.made-in-china.com/multi-search/${encodeURIComponent(q)}/F1/`,
+  'Spocket':       (q) => `https://www.spocket.co/products?search=${encodeURIComponent(q)}`,
+  'Mercado Libre': (q) => `https://listado.mercadolibre.com.mx/search?as_word=${encodeURIComponent(q)}`,
 }
 
 const PLATFORM_ICONS: Record<string, string> = {
@@ -56,34 +60,53 @@ function buildAdviceMessage(query: string, viability: Record<string, unknown>): 
 export default function MiriamChat({ onSearch }: Props) {
   const t = useT()
   const {
-    messages, minimized, height, isStreaming, pendingAdvice, foundSuppliers, context, viabilitySummary,
-    addMessage, setContext, setMinimized, setHeight,
+    threads, activeThreadId,
+    minimized, width, height, posX, posY,
+    isStreaming, pendingAdvice,
+    createThread, deleteThread, switchThread,
+    addMessage, setContext, setMinimized, setWidth, setHeight, setPosition,
     setIsStreaming, clearPendingAdvice, reset,
   } = useMiriamStore()
 
   const lang = useLangStore((s) => s.lang)
+
+  // Derived: active thread data
+  const activeThread = useMemo(
+    () => threads.find((t) => t.id === activeThreadId) ?? threads[0],
+    [threads, activeThreadId],
+  )
+  const messages = activeThread?.messages ?? []
+  const context = activeThread?.context ?? null
+  const foundSuppliers = activeThread?.foundSuppliers ?? []
+  const viabilitySummary = activeThread?.viabilitySummary ?? null
+
   const [input, setInput] = useState('')
   const [streamingText, setStreamingText] = useState('')
   const [pendingOptions, setPendingOptions] = useState<SearchOptions | null>(null)
   const [optionsLoading, setOptionsLoading] = useState(false)
+  const [threadPickerOpen, setThreadPickerOpen] = useState(false)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const dragRef = useRef<{ startY: number; startH: number } | null>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const wasDragging = useRef(false)
   const hasWelcomed = useRef(false)
 
-  // Welcome on first load
+  // Reset pending options when switching threads
   useEffect(() => {
-    if (messages.length === 0) {
-      hasWelcomed.current = false
-    }
+    setPendingOptions(null)
+    setOptionsLoading(false)
+    setThreadPickerOpen(false)
+  }, [activeThreadId])
+
+  // Welcome message on first load / after clear
+  useEffect(() => {
+    if (messages.length === 0) hasWelcomed.current = false
     if (!hasWelcomed.current) {
       hasWelcomed.current = true
-      if (messages.length === 0) {
-        addMessage({ role: 'assistant', content: t.miriam_welcome })
-      }
+      if (messages.length === 0) addMessage({ role: 'assistant', content: t.miriam_welcome })
     }
   }, []) // eslint-disable-line
 
-  // Re-add welcome after clear
   useEffect(() => {
     if (messages.length === 0 && hasWelcomed.current) {
       addMessage({ role: 'assistant', content: t.miriam_welcome })
@@ -103,90 +126,185 @@ export default function MiriamChat({ onSearch }: Props) {
     sendMessage(msg, true)
   }, [pendingAdvice]) // eslint-disable-line
 
-  const parseSignal = useCallback((signal: string): void => {
-    if (signal.includes('<SEARCH_READY>')) {
-      const match = signal.match(/<SEARCH_READY>([\s\S]*?)<\/SEARCH_READY>/)
-      if (match) {
-        try {
-          const ctx: SearchContext = JSON.parse(match[1])
-          setContext(ctx)
-          onSearch(ctx.refined_query, undefined, ctx.market.toUpperCase(), ctx)
-        } catch { /* malformed */ }
+  const parseSignal = useCallback(
+    (signal: string): void => {
+      if (signal.includes('<SEARCH_READY>')) {
+        const match = signal.match(/<SEARCH_READY>([\s\S]*?)<\/SEARCH_READY>/)
+        if (match) {
+          try {
+            const ctx: SearchContext = JSON.parse(match[1])
+            setContext(ctx)
+            onSearch(ctx.refined_query, undefined, ctx.market.toUpperCase(), ctx)
+          } catch { /* malformed */ }
+        }
+      } else if (signal.includes('<INVALID_QUERY>')) {
+        const match = signal.match(/<INVALID_QUERY>([\s\S]*?)<\/INVALID_QUERY>/)
+        let reason = t.miriam_invalid_query
+        if (match) {
+          try {
+            const p = JSON.parse(match[1])
+            if (p.reason) reason = p.reason
+          } catch { /* */ }
+        }
+        addMessage({ role: 'assistant', content: `⚠️ ${reason}` })
+      } else if (signal.includes('<SUPPLIERS>')) {
+        const match = signal.match(/<SUPPLIERS>([\s\S]*?)<\/SUPPLIERS>/)
+        if (match) {
+          try {
+            const payload = JSON.parse(match[1])
+            const q = payload.query || ''
+            const cards: SupplierCard[] = ((payload.platforms as string[]) || [])
+              .filter((p) => SUPPLIER_URLS[p])
+              .map((p) => ({
+                platform: p,
+                url: SUPPLIER_URLS[p](q),
+                description: PLATFORM_DESCRIPTIONS[p] || '',
+              }))
+            if (cards.length > 0) {
+              addMessage({ role: 'assistant', content: '', suppliers: cards })
+            }
+          } catch { /* malformed */ }
+        }
       }
-    } else if (signal.includes('<INVALID_QUERY>')) {
-      const match = signal.match(/<INVALID_QUERY>([\s\S]*?)<\/INVALID_QUERY>/)
-      let reason = t.miriam_invalid_query
-      if (match) {
-        try { const p = JSON.parse(match[1]); if (p.reason) reason = p.reason } catch { /* */ }
-      }
-      addMessage({ role: 'assistant', content: `⚠️ ${reason}` })
-    } else if (signal.includes('<SUPPLIERS>')) {
-      const match = signal.match(/<SUPPLIERS>([\s\S]*?)<\/SUPPLIERS>/)
-      if (match) {
-        try {
-          const payload = JSON.parse(match[1])
-          const q = payload.query || ''
-          const cards: SupplierCard[] = ((payload.platforms as string[]) || [])
-            .filter(p => SUPPLIER_URLS[p])
-            .map(p => ({
-              platform: p,
-              url: SUPPLIER_URLS[p](q),
-              description: PLATFORM_DESCRIPTIONS[p] || '',
-            }))
-          if (cards.length > 0) {
-            addMessage({ role: 'assistant', content: '', suppliers: cards })
-          }
-        } catch { /* malformed */ }
-      }
-    }
-  }, [onSearch, setContext, addMessage, t.miriam_invalid_query])
+    },
+    [onSearch, setContext, addMessage, t.miriam_invalid_query],
+  )
 
-  const sendMessage = useCallback(async (text: string, silent = false) => {
-    if (!text.trim() || isStreaming) return
-    const userMsg = text.trim()
-    setInput('')
-    if (!silent) addMessage({ role: 'user', content: userMsg })
-
-    // Pre-search: no context yet → show options panel instead of text Q&A
-    if (context === null) {
-      setOptionsLoading(true)
-      setPendingOptions(null)
-      setHeight(Math.max(height, 520))
-      setMinimized(false)
+  const runChatStream = useCallback(
+    async (userMsg: string) => {
+      setIsStreaming(true)
+      setStreamingText('')
+      let accumulated = ''
+      let signalAccumulated = ''
       try {
-        const opts = await clarifyQuery(userMsg, lang)
-        setPendingOptions(opts)
+        for await (const chunk of streamMiriam(messages, userMsg, foundSuppliers, context, viabilitySummary)) {
+          if (chunk.done) break
+          if (chunk.text) { accumulated += chunk.text; setStreamingText(accumulated) }
+          if (chunk.signal) { signalAccumulated += chunk.signal }
+        }
       } catch {
-        // Fallback: normal chat flow
-        await runChatStream(userMsg)
-      } finally {
-        setOptionsLoading(false)
+        accumulated = 'Sorry, something went wrong. Please try again.'
       }
-      return
+      if (accumulated.trim()) addMessage({ role: 'assistant', content: accumulated.trim() })
+      setStreamingText('')
+      setIsStreaming(false)
+      if (signalAccumulated) parseSignal(signalAccumulated)
+    },
+    [messages, foundSuppliers, context, viabilitySummary, addMessage, setIsStreaming, parseSignal],
+  )
+
+  const sendMessage = useCallback(
+    async (text: string, silent = false) => {
+      if (!text.trim() || isStreaming) return
+      const userMsg = text.trim()
+      setInput('')
+      if (!silent) addMessage({ role: 'user', content: userMsg })
+
+      // Pre-search: no context yet → show options panel
+      if (context === null) {
+        setOptionsLoading(true)
+        setPendingOptions(null)
+        setHeight(Math.max(height, 520))
+        setMinimized(false)
+        try {
+          const opts = await clarifyQuery(userMsg, lang)
+          setPendingOptions(opts)
+        } catch {
+          await runChatStream(userMsg)
+        } finally {
+          setOptionsLoading(false)
+        }
+        return
+      }
+
+      await runChatStream(userMsg)
+    },
+    [messages, isStreaming, context, lang, height, addMessage, setIsStreaming, setHeight, setMinimized, runChatStream], // eslint-disable-line
+  )
+
+  // ─── Drag to move panel ──────────────────────────────────────────────────
+  const startPanelDrag = useCallback(
+    (e: React.MouseEvent) => {
+      if (typeof window === 'undefined' || window.innerWidth < 640) return
+      e.preventDefault()
+      wasDragging.current = false
+
+      const rect = panelRef.current?.getBoundingClientRect()
+      if (!rect) return
+
+      const startX = e.clientX
+      const startY = e.clientY
+      const startLeft = rect.left
+      const startTop = rect.top
+
+      const onMove = (ev: MouseEvent) => {
+        const dx = ev.clientX - startX
+        const dy = ev.clientY - startY
+        if (!wasDragging.current && Math.hypot(dx, dy) < 4) return
+        wasDragging.current = true
+        const panelW = rect.width
+        const panelH = minimized ? HEADER_HEIGHT : height
+        const newX = Math.max(0, Math.min(window.innerWidth - panelW, startLeft + dx))
+        const newY = Math.max(0, Math.min(window.innerHeight - HEADER_HEIGHT, startTop + dy))
+        setPosition(Math.round(newX), Math.round(newY))
+      }
+
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+      }
+
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+    },
+    [height, minimized, setPosition],
+  )
+
+  // ─── Top edge: resize height ──────────────────────────────────────────────
+  const startTopResize = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const startY = e.clientY
+    const startH = height
+    const rect = panelRef.current?.getBoundingClientRect()
+    const startTop = rect?.top ?? 0
+
+    const onMove = (ev: MouseEvent) => {
+      const dy = startY - ev.clientY
+      const newH = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, startH + dy))
+      setHeight(newH)
+      if (posX !== null) {
+        // Explicit position: keep bottom fixed, adjust top
+        const newTop = Math.max(0, startTop - (newH - startH))
+        setPosition(posX, Math.round(newTop))
+      }
     }
 
-    await runChatStream(userMsg)
-  }, [messages, isStreaming, context, lang, height, addMessage, setIsStreaming, setHeight, setMinimized, parseSignal]) // eslint-disable-line
-
-  const runChatStream = useCallback(async (userMsg: string) => {
-    setIsStreaming(true)
-    setStreamingText('')
-    let accumulated = ''
-    let signalAccumulated = ''
-    try {
-      for await (const chunk of streamMiriam(messages, userMsg, foundSuppliers, context, viabilitySummary)) {
-        if (chunk.done) break
-        if (chunk.text) { accumulated += chunk.text; setStreamingText(accumulated) }
-        if (chunk.signal) { signalAccumulated += chunk.signal }
-      }
-    } catch {
-      accumulated = 'Sorry, something went wrong. Please try again.'
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
     }
-    if (accumulated.trim()) addMessage({ role: 'assistant', content: accumulated.trim() })
-    setStreamingText('')
-    setIsStreaming(false)
-    if (signalAccumulated) parseSignal(signalAccumulated)
-  }, [messages, foundSuppliers, context, viabilitySummary, addMessage, setIsStreaming, parseSignal])
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  // ─── Right edge: resize width ─────────────────────────────────────────────
+  const startRightResize = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = width
+
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - startX
+      setWidth(Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startW + dx)))
+    }
+
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -195,78 +313,157 @@ export default function MiriamChat({ onSearch }: Props) {
     }
   }
 
-  const handleClear = useCallback(() => {
-    reset()
-    setPendingOptions(null)
-  }, [reset])
+  const panelH = minimized ? HEADER_HEIGHT : height
+  const hasMultipleThreads = threads.length > 1
 
-  const onDragStart = (e: React.MouseEvent) => {
-    e.preventDefault()
-    dragRef.current = { startY: e.clientY, startH: height }
-    const onMove = (ev: MouseEvent) => {
-      if (!dragRef.current) return
-      setHeight(dragRef.current.startH + (dragRef.current.startY - ev.clientY))
-    }
-    const onUp = () => {
-      dragRef.current = null
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-  }
-
-  const panelHeight = minimized ? HEADER_HEIGHT : height
+  const posStyle: React.CSSProperties =
+    posX !== null && posY !== null
+      ? { left: posX, top: posY, right: 'auto', bottom: 'auto' }
+      : { right: 16, bottom: 0, left: 'auto', top: 'auto' }
 
   return (
     <div
-      style={{ height: panelHeight }}
-      className="fixed bottom-0 right-0 sm:right-4 z-50 w-full sm:w-72 flex flex-col rounded-t-lg border border-border bg-background shadow-xl overflow-hidden"
+      ref={panelRef}
+      style={{ height: panelH, width, ...posStyle }}
+      className="fixed z-50 flex flex-col rounded-t-lg border border-border bg-background shadow-xl"
     >
-      {/* Drag handle */}
+      {/* Top resize handle */}
       {!minimized && (
         <div
-          onMouseDown={onDragStart}
-          className="absolute top-0 left-0 right-0 h-1 cursor-ns-resize bg-border/30 hover:bg-primary/30 transition-colors z-10"
+          onMouseDown={startTopResize}
+          className="absolute top-0 left-0 right-0 h-1 cursor-ns-resize bg-border/30 hover:bg-primary/30 transition-colors z-20"
         />
       )}
 
-      {/* Header */}
+      {/* Right resize handle */}
       <div
-        className="flex items-center justify-between px-3 select-none border-b border-border bg-muted/20 shrink-0"
+        onMouseDown={startRightResize}
+        className="absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize bg-transparent hover:bg-primary/20 transition-colors z-20"
+      />
+
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <div
+        className="flex items-center px-2 gap-1.5 select-none border-b border-border bg-muted/20 shrink-0"
         style={{ height: HEADER_HEIGHT }}
       >
+        {/* Drag grip */}
         <div
-          className="flex items-center gap-2 flex-1 cursor-pointer"
-          onClick={() => setMinimized(!minimized)}
+          onMouseDown={startPanelDrag}
+          title="Drag to move"
+          className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors shrink-0 hidden sm:flex"
         >
-          <span className="text-xs font-semibold text-foreground tracking-wide">{t.miriam_title}</span>
-          {isStreaming && <span className="inline-block w-1 h-1 rounded-full bg-primary animate-pulse" />}
+          <svg width="7" height="11" viewBox="0 0 7 11" fill="currentColor">
+            <circle cx="1.5" cy="1.5" r="1.1" /><circle cx="5.5" cy="1.5" r="1.1" />
+            <circle cx="1.5" cy="5.5" r="1.1" /><circle cx="5.5" cy="5.5" r="1.1" />
+            <circle cx="1.5" cy="9.5" r="1.1" /><circle cx="5.5" cy="9.5" r="1.1" />
+          </svg>
         </div>
-        <div className="flex items-center gap-0.5">
-          {messages.length > 1 && !isStreaming && (
-            <button
-              onClick={(e) => { e.stopPropagation(); handleClear() }}
-              title="Nuova chat"
-              className="p-1 rounded text-muted-foreground/30 hover:text-red-500 transition-colors"
-            >
-              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path d="M18 6L6 18M6 6l12 12"/>
-              </svg>
-            </button>
+
+        {/* Thread title / picker toggle */}
+        <button
+          onClick={() => {
+            if (hasMultipleThreads || true) setThreadPickerOpen((v) => !v)
+          }}
+          className="flex items-center gap-1 flex-1 min-w-0 text-left"
+        >
+          <span className="text-xs font-semibold text-foreground tracking-wide truncate">
+            {activeThread?.title === 'New chat' ? t.miriam_title : (activeThread?.title ?? t.miriam_title)}
+          </span>
+          {isStreaming && (
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary animate-pulse shrink-0" />
           )}
-          <button
-            className="text-muted-foreground/40 text-[10px] cursor-pointer px-1 hover:text-muted-foreground transition-colors"
-            onClick={() => setMinimized(!minimized)}
+          <svg
+            className="w-2.5 h-2.5 text-muted-foreground/40 shrink-0 ml-auto"
+            fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
           >
-            {minimized ? '▲' : '▼'}
-          </button>
-        </div>
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+
+        {/* New thread */}
+        <button
+          onClick={() => { createThread(); setThreadPickerOpen(false) }}
+          title="New conversation"
+          className="p-1 rounded text-muted-foreground/40 hover:text-foreground hover:bg-muted/40 transition-colors shrink-0"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+
+        {/* Minimize */}
+        <button
+          onClick={() => setMinimized(!minimized)}
+          className="p-1 rounded text-muted-foreground/40 hover:text-muted-foreground transition-colors shrink-0 text-[9px] leading-none"
+        >
+          {minimized ? '▲' : '▼'}
+        </button>
       </div>
 
-      {/* Body */}
+      {/* ── Body ───────────────────────────────────────────────── */}
       {!minimized && (
-        <>
+        <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
+
+          {/* Thread picker overlay */}
+          {threadPickerOpen && (
+            <div className="absolute inset-0 bg-background z-10 flex flex-col">
+              <div className="px-3 py-2 border-b border-border flex items-center justify-between shrink-0">
+                <span className="text-xs font-semibold text-foreground">Conversations</span>
+                <button
+                  onClick={() => setThreadPickerOpen(false)}
+                  className="p-1 rounded text-muted-foreground/50 hover:text-foreground transition-colors"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto py-1 min-h-0">
+                {threads.map((thread) => (
+                  <div
+                    key={thread.id}
+                    className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer group transition-colors ${
+                      thread.id === activeThreadId
+                        ? 'bg-muted/60'
+                        : 'hover:bg-muted/30'
+                    }`}
+                    onClick={() => { switchThread(thread.id); setThreadPickerOpen(false) }}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-foreground truncate">{thread.title}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {thread.messages.length} message{thread.messages.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteThread(thread.id) }}
+                      title="Delete conversation"
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground/40 hover:text-red-500 transition-all shrink-0"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-border p-2 shrink-0">
+                <button
+                  onClick={() => { createThread(); setThreadPickerOpen(false) }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded text-xs text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  New conversation
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Messages */}
           <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2.5 min-h-0">
             {messages.map((msg, i) => (
               <MessageBubble key={i} role={msg.role} content={msg.content} suppliers={msg.suppliers} />
@@ -277,7 +474,6 @@ export default function MiriamChat({ onSearch }: Props) {
             {isStreaming && !streamingText && !optionsLoading && (
               <p className="text-[11px] text-muted-foreground/60 italic">{t.miriam_typing}</p>
             )}
-            {/* Options panel — shown inline when pre-search clarification is needed */}
             {(pendingOptions || optionsLoading) && (
               <div className="mt-1">
                 <MiriamOptionsPanel
@@ -295,6 +491,7 @@ export default function MiriamChat({ onSearch }: Props) {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Input */}
           <div className="border-t border-border px-3 py-2 flex gap-2 items-end shrink-0">
             <textarea
               rows={1}
@@ -314,7 +511,7 @@ export default function MiriamChat({ onSearch }: Props) {
               {t.miriam_send}
             </button>
           </div>
-        </>
+        </div>
       )}
     </div>
   )
@@ -348,7 +545,7 @@ function MessageBubble({
               <p className="text-[10px] text-muted-foreground truncate">{s.description}</p>
             </div>
             <svg className="w-2.5 h-2.5 text-muted-foreground/30 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
             </svg>
           </a>
         ))}
