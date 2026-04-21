@@ -319,13 +319,13 @@ export default function MiriamChat({ onSearch }: Props) {
   const posStyle: React.CSSProperties =
     posX !== null && posY !== null
       ? { left: posX, top: posY, right: 'auto', bottom: 'auto' }
-      : { right: 16, bottom: 0, left: 'auto', top: 'auto' }
+      : { right: 24, bottom: 20, left: 'auto', top: 'auto' }
 
   return (
     <div
       ref={panelRef}
       style={{ height: panelH, width, ...posStyle }}
-      className="fixed z-50 flex flex-col rounded-t-lg border border-border bg-background shadow-xl"
+      className="fixed z-50 flex flex-col rounded-lg border border-border bg-background shadow-2xl"
     >
       {/* Top resize handle */}
       {!minimized && (
@@ -343,15 +343,16 @@ export default function MiriamChat({ onSearch }: Props) {
 
       {/* ── Header ─────────────────────────────────────────────── */}
       <div
-        className="flex items-center px-2 gap-1.5 select-none border-b border-border bg-muted/20 shrink-0"
+        onMouseDown={(e) => {
+          if ((e.target as HTMLElement).closest('button, a')) return
+          startPanelDrag(e)
+        }}
+        className="flex items-center px-2 gap-1.5 select-none border-b border-border bg-muted/20 shrink-0 cursor-grab active:cursor-grabbing sm:cursor-grab"
         style={{ height: HEADER_HEIGHT }}
+        title="Drag to move"
       >
-        {/* Drag grip */}
-        <div
-          onMouseDown={startPanelDrag}
-          title="Drag to move"
-          className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors shrink-0 hidden sm:flex"
-        >
+        {/* Drag grip — visual hint only */}
+        <div className="p-1 text-muted-foreground/25 shrink-0 hidden sm:flex pointer-events-none">
           <svg width="7" height="11" viewBox="0 0 7 11" fill="currentColor">
             <circle cx="1.5" cy="1.5" r="1.1" /><circle cx="5.5" cy="1.5" r="1.1" />
             <circle cx="1.5" cy="5.5" r="1.1" /><circle cx="5.5" cy="5.5" r="1.1" />
