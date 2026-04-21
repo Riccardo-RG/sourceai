@@ -41,6 +41,7 @@ Analyze for an e-commerce seller:
 
 **Product:** {query}
 **Category:** {category}
+**Business model:** {business_model}
 **Target market:** {market_name} ({market_code}) — currency: {currency}
 
 **Google Trends data for {market_name} (REAL — use for demand and trend_yoy):**
@@ -612,9 +613,14 @@ async def _run_ai(
         if response_lang != "English" else ""
     )
 
+    _CHANNEL_LABELS = {"dropshipping": "Dropshipping (no stock, direct supplier-to-customer)", "stock": "Stock (buy and hold inventory)", "misto": "Mixed (part dropshipping, part own stock)"}
+    business_model = _CHANNEL_LABELS.get((category or "").lower(), "Not specified")
+    product_category = category if category not in _CHANNEL_LABELS else "unspecified"
+
     prompt = USER_PROMPT.format(
         query=query,
-        category=category or "unspecified",
+        category=product_category,
+        business_model=business_model,
         market_name=market_name,
         market_code=market.upper(),
         currency=currency,

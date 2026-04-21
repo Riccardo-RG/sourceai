@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { useT } from '@/hooks/useT'
 import type { SearchOptions, SearchContext } from '@/types'
 
+// Single-select groups — only one value allowed
+const SINGLE_SELECT = new Set(['positioning', 'market'])
+
 const POSITIONING_ICONS: Record<string, string> = {
   mass_market: '📦',
   premium: '✦',
@@ -22,6 +25,8 @@ const CHANNEL_ICONS: Record<string, string> = {
   online: '🛒',
   store: '🏪',
   dropshipping: '🚀',
+  stock: '📦',
+  misto: '🔀',
 }
 
 function getChoiceIcon(groupId: string, value: string): string | undefined {
@@ -47,24 +52,53 @@ export default function MiriamOptionsPanel({
   onCancel,
 }: Props) {
   const t = useT()
-  const [selections, setSelections] = useState<Record<string, string>>({
+  // Selections: single-select groups → string, multi-select → string[]
+  const [selections, setSelections] = useState<Record<string, string | string[]>>({
     market: initialMarket,
   })
 
-  const select = (groupId: string, value: string) =>
-    setSelections((s) => ({ ...s, [groupId]: value }))
+  const toggle = (groupId: string, value: string) => {
+    if (SINGLE_SELECT.has(groupId)) {
+      setSelections((s) => ({ ...s, [groupId]: value }))
+    } else {
+      setSelections((s) => {
+        const current = (s[groupId] as string[] | undefined) ?? []
+        const next = current.includes(value)
+          ? current.filter((v) => v !== value)
+          : [...current, value]
+        return { ...s, [groupId]: next }
+      })
+    }
+  }
+
+  const isSelected = (groupId: string, value: string): boolean => {
+    const sel = selections[groupId]
+    if (Array.isArray(sel)) return sel.includes(value)
+    return sel === value
+  }
 
   const canConfirm = !!(options && selections['positioning'])
 
   const handleConfirm = () => {
     if (!options || !selections['positioning']) return
-    const market = (selections['market'] || initialMarket).toUpperCase()
+    const market = ((selections['market'] as string) || initialMarket).toUpperCase()
+
+    const channelSel = selections['channel']
+    const channel = Array.isArray(channelSel)
+      ? channelSel.join(',')
+      : (channelSel as string) || 'online'
+
+    const targetSel = selections['target_customer']
+    const target_customer = Array.isArray(targetSel)
+      ? targetSel.join(',')
+      : (targetSel as string) || ''
+
     const ctx: SearchContext = {
       refined_query: options.refined_query,
       positioning: selections['positioning'] as SearchContext['positioning'],
       market,
-      channel: (selections['channel'] as SearchContext['channel']) || 'online',
-      target_customer: selections['target_customer'] || '',
+      channel: channel as SearchContext['channel'],
+      target_customer,
       supplier_context: '',
     }
     onConfirm(options.refined_query, market, ctx)
@@ -85,49 +119,59 @@ export default function MiriamOptionsPanel({
 
       {/* Option groups */}
       <div className="px-4 py-5 space-y-6">
-        {options.groups.map((group) => (
-          <div key={group.id} className="space-y-2.5">
-            <p className="text-[10px] font-semibold tracking-widest text-muted-foreground/60 uppercase">
-              {group.label}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {group.choices.map((choice) => {
-                const selected = selections[group.id] === choice.value
-                const icon = getChoiceIcon(group.id, choice.value)
-                return (
-                  <button
-                    key={choice.value}
-                    onClick={() => select(group.id, choice.value)}
-                    className={`
-                      flex items-start gap-2 px-3 py-2 rounded-md border text-left transition-all
-                      ${selected
-                        ? 'border-primary/60 bg-primary/10 text-foreground ring-1 ring-primary/20'
-                        : 'border-border bg-background hover:border-primary/30 hover:bg-muted/40 text-foreground'
-                      }
-                    `}
-                  >
-                    {icon && (
-                      <span className="text-sm shrink-0 mt-px leading-none">{icon}</span>
-                    )}
-                    <div className="min-w-0">
-                      <p className={`text-xs font-semibold leading-snug ${selected ? 'text-primary' : ''}`}>
-                        {choice.label}
-                      </p>
-                      {choice.desc && (
-                        <p className="text-[10px] text-muted-foreground/60 leading-snug mt-0.5">
-                          {choice.desc}
-                        </p>
+        {options.groups.map((group) => {
+          const isMulti = !SINGLE_SELECT.has(group.id)
+          return (
+            <div key={group.id} className="space-y-2.5">
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] font-semibold tracking-widest text-muted-foreground/60 uppercase">
+                  {group.label}
+                </p>
+                {isMulti && (
+                  <span className="text-[9px] text-muted-foreground/40 uppercase tracking-wider">
+                    (più opzioni)
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {group.choices.map((choice) => {
+                  const selected = isSelected(group.id, choice.value)
+                  const icon = getChoiceIcon(group.id, choice.value)
+                  return (
+                    <button
+                      key={choice.value}
+                      onClick={() => toggle(group.id, choice.value)}
+                      className={`
+                        flex items-start gap-2 px-3 py-2 rounded-md border text-left transition-all
+                        ${selected
+                          ? 'border-primary/60 bg-primary/10 text-foreground ring-1 ring-primary/20'
+                          : 'border-border bg-background hover:border-primary/30 hover:bg-muted/40 text-foreground'
+                        }
+                      `}
+                    >
+                      {icon && (
+                        <span className="text-sm shrink-0 mt-px leading-none">{icon}</span>
                       )}
-                    </div>
-                    {selected && (
-                      <span className="ml-1.5 shrink-0 text-primary text-[10px] font-bold self-center">✓</span>
-                    )}
-                  </button>
-                )
-              })}
+                      <div className="min-w-0">
+                        <p className={`text-xs font-semibold leading-snug ${selected ? 'text-primary' : ''}`}>
+                          {choice.label}
+                        </p>
+                        {choice.desc && (
+                          <p className="text-[10px] text-muted-foreground/60 leading-snug mt-0.5">
+                            {choice.desc}
+                          </p>
+                        )}
+                      </div>
+                      {selected && (
+                        <span className="ml-1.5 shrink-0 text-primary text-[10px] font-bold self-center">✓</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Footer */}

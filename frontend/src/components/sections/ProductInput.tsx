@@ -13,6 +13,12 @@ const MARKETS = [
   { code: 'MIDDLE_EAST',   flag: '🌍', label: 'Middle East'    },
 ]
 
+const CHANNEL_FILTERS = [
+  { key: 'dropshipping', label: 'Dropshipping', tooltip: 'Nessun magazzino — il fornitore spedisce direttamente al cliente' },
+  { key: 'stock',        label: 'Stock',         tooltip: 'Acquisti e tieni la merce: più controllo, investimento iniziale' },
+  { key: 'misto',        label: 'Misto',          tooltip: 'Approccio ibrido: parte dropshipping, parte stock proprio' },
+]
+
 interface ProductInputProps {
   onSearch: (query: string, category?: string, market?: string) => void
   onMarketChange?: (market: string) => void
@@ -24,6 +30,7 @@ export default function ProductInput({ onSearch, onMarketChange, isLoading, mark
   const t = useT()
   const [query, setQuery] = useState('')
   const [internalMarket, setInternalMarket] = useState('GLOBAL')
+  const [channel, setChannel] = useState<string | undefined>()
 
   const market = controlledMarket ?? internalMarket
   const setMarket = (m: string) => {
@@ -33,7 +40,7 @@ export default function ProductInput({ onSearch, onMarketChange, isLoading, mark
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (query.trim() && !isLoading) onSearch(query.trim(), undefined, market)
+    if (query.trim() && !isLoading) onSearch(query.trim(), channel, market)
   }
 
   const selectedMarket = MARKETS.find((m) => m.code === market) ?? MARKETS[0]
@@ -91,6 +98,26 @@ export default function ProductInput({ onSearch, onMarketChange, isLoading, mark
         </div>
       </form>
 
+      {/* Fulfillment model filter chips */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-[10px] text-muted-foreground/50 font-medium uppercase tracking-wider shrink-0">Modello</span>
+        {CHANNEL_FILTERS.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            onClick={() => setChannel(channel === f.key ? undefined : f.key)}
+            disabled={isLoading}
+            title={f.tooltip}
+            className={`text-xs px-2.5 py-1 rounded border transition-colors cursor-pointer select-none disabled:opacity-40
+              ${channel === f.key
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-transparent text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground'
+              }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
