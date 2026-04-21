@@ -359,11 +359,11 @@ function LoadingSteps() {
   )
 }
 
-const SCORE_SOURCE: Record<string, { label: string; dot: string; text: string }> = {
-  demand:          { label: 'Google Trends', dot: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-400' },
-  competition:     { label: 'AI estimate',   dot: 'bg-muted-foreground/40', text: 'text-muted-foreground/60' },
-  margin_potential:{ label: 'Amazon + AI',   dot: 'bg-amber-400',  text: 'text-amber-600 dark:text-amber-400' },
-  sourcing_ease:   { label: 'AI estimate',   dot: 'bg-muted-foreground/40', text: 'text-muted-foreground/60' },
+const SCORE_SOURCE: Record<string, { label: string; dot: string; text: string; tooltip: string }> = {
+  demand:          { label: 'Google Trends', dot: 'bg-emerald-500',        text: 'text-emerald-700 dark:text-emerald-400', tooltip: 'Dato reale — indice di interesse ricavato da Google Trends tramite DataForSEO' },
+  competition:     { label: 'AI estimate',   dot: 'bg-muted-foreground/40', text: 'text-muted-foreground/60',              tooltip: 'Stima AI — calcolata da Claude in base alla domanda e alla saturazione del mercato' },
+  margin_potential:{ label: 'Amazon + AI',   dot: 'bg-amber-400',           text: 'text-amber-600 dark:text-amber-400',   tooltip: 'Dato indicativo — prezzi rilevati su Amazon via Tavily + analisi del margine da Claude' },
+  sourcing_ease:   { label: 'AI estimate',   dot: 'bg-muted-foreground/40', text: 'text-muted-foreground/60',              tooltip: 'Stima AI — calcolata da Claude in base alla categoria prodotto e ai fornitori disponibili' },
 }
 
 function ScoresRow({ data }: { data: Record<string, unknown> | null }) {
@@ -403,7 +403,10 @@ function ScoresRow({ data }: { data: Record<string, unknown> | null }) {
               <div className={`h-full ${barColor} transition-all duration-700`} style={{ width: `${raw}%` }} />
             </div>
             {src && (
-              <span className={`inline-flex items-center gap-1 text-[9px] font-medium ${src.text}`}>
+              <span
+                className={`inline-flex items-center gap-1 text-[9px] font-medium ${src.text} cursor-help`}
+                title={src.tooltip}
+              >
                 <span className={`w-1 h-1 rounded-full shrink-0 ${src.dot}`} />
                 {src.label}
               </span>
@@ -429,7 +432,10 @@ function TrendsCard({ data }: { data: Record<string, unknown> | null }) {
 
   return (
     <div className="inline-flex items-center gap-2.5 px-3 py-2 rounded-md border border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/50 dark:bg-emerald-950/20 text-xs">
-      <span className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+      <span
+        className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 cursor-help"
+        title="Dato reale — indice di interesse aggiornato da Google Trends tramite DataForSEO"
+      >
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
         Google Trends
         <span className="text-[9px] font-bold tracking-wider text-emerald-600/70 dark:text-emerald-500/70 uppercase">live</span>
@@ -455,7 +461,10 @@ function PriceRangeCard({ data }: { data: Record<string, unknown> | null }) {
   const tld = typeof data?.trends_market === 'string' ? `Amazon ${data.trends_market}` : 'Amazon'
   return (
     <div className="inline-flex items-center gap-2.5 px-3 py-2 rounded-md border border-border bg-card text-xs">
-      <span className="font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1">
+      <span
+        className="font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1 cursor-help"
+        title="Dato indicativo — prezzi rilevati su Amazon tramite Tavily (scraping web). Possono avere ritardi o imprecisioni."
+      >
         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
         {tld}
       </span>
