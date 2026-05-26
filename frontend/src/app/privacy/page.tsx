@@ -33,9 +33,8 @@ export default function PrivacyPage() {
           <li><strong className="text-foreground">Anthropic (Claude AI)</strong> — analisi di mercato e chat Miriam. Le query vengono inviate ai server Anthropic. <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Privacy Policy Anthropic</a></li>
           <li><strong className="text-foreground">DataForSEO</strong> — dati Google Trends. Le query vengono inviate ai server DataForSEO. <a href="https://dataforseo.com/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Privacy Policy DataForSEO</a></li>
           <li><strong className="text-foreground">Tavily</strong> — ricerca web per prezzi Amazon e supplier. Le query vengono inviate ai server Tavily. <a href="https://tavily.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Privacy Policy Tavily</a></li>
-          <li><strong className="text-foreground">Supabase</strong> — autenticazione e database. I dati sono ospitati su Supabase (EU region). <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Privacy Policy Supabase</a></li>
-          <li><strong className="text-foreground">Vercel</strong> — hosting del frontend. <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Privacy Policy Vercel</a></li>
-          <li><strong className="text-foreground">Railway</strong> — hosting del backend. <a href="https://railway.app/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Privacy Policy Railway</a></li>
+          <li><strong className="text-foreground">Supabase</strong> — autenticazione e database. I dati sono ospitati sul progetto Supabase configurato dal deployer. <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Privacy Policy Supabase</a></li>
+          <li><strong className="text-foreground">Hosting provider</strong> — frontend e backend possono essere ospitati dal deployer sull&apos;infrastruttura che preferisce.</li>
         </ul>
       </Section>
 
@@ -64,12 +63,12 @@ export default function PrivacyPage() {
         <ul className="list-disc list-inside space-y-1.5 text-sm text-muted-foreground">
           <li>Cache ricerche: 24 ore</li>
           <li>Outreach e scenari: fino alla cancellazione da parte dell&apos;utente</li>
-          <li>Log tecnici (Railway/Vercel): max 30 giorni</li>
+          <li>Log tecnici del provider di hosting: max 30 giorni</li>
         </ul>
       </Section>
 
       <Section title="7. Contatti">
-        <p>Per domande sulla privacy o per esercitare i tuoi diritti, scrivici a: <strong className="text-foreground">privacy@sourceai.app</strong></p>
+        <p>Per una pubblicazione reale, configura qui il tuo indirizzo privacy o supporto.</p>
       </Section>
     </div>
   )

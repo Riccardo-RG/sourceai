@@ -45,7 +45,7 @@ See [DATA_SOURCES.md](./DATA_SOURCES.md) for the detailed mapping between each U
 - Auth and persistence: Supabase
 - AI: Anthropic models
 - External data: DataForSEO, Tavily
-- Deployment config: Vercel + Railway-oriented files already present in the repo
+- Deployment: self-hostable frontend/backend setup with environment-based configuration only
 
 ## Repository Structure
 
@@ -71,7 +71,7 @@ See [DATA_SOURCES.md](./DATA_SOURCES.md) for the detailed mapping between each U
 |  |- .env.example
 |  `- package.json
 |- DATA_SOURCES.md
-`- vercel.json
+`- README.md
 ```
 
 ## Data Reliability Model
@@ -123,6 +123,60 @@ Required frontend environment variables:
 
 The frontend runs on [http://localhost:3000](http://localhost:3000) and expects the backend on `http://localhost:8000` by default.
 
+## Create Your Own Service Accounts
+
+This repository intentionally does not include a public deployment URL or any live credentials.
+To run your own copy, create your own accounts and paste the generated values into the example env files.
+
+### Backend credentials
+
+- `ANTHROPIC_API_KEY`
+  Create an API key in the [Anthropic Console](https://console.anthropic.com/).
+- `TAVILY_API_KEY`
+  Create an API key in the [Tavily dashboard](https://app.tavily.com/).
+- `SUPABASE_URL` and `SUPABASE_KEY`
+  Create a project in [Supabase](https://supabase.com/), then use the project URL and service-role key from `Project Settings -> API`.
+- `DATAFORSEO_LOGIN` and `DATAFORSEO_PASSWORD`
+  Use your own credentials from [DataForSEO](https://app.dataforseo.com/).
+
+### Frontend credentials
+
+- `NEXT_PUBLIC_API_URL`
+  Your own backend URL, for example `http://localhost:8000` locally or `https://api.your-domain.com` in production.
+- `NEXT_PUBLIC_SUPABASE_URL`
+  Your own Supabase project URL.
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  Your own Supabase anon/public key from `Project Settings -> API`.
+
+## Deploy Your Own Copy
+
+If you want to publish your own instance, generate your own URLs and wire them like this:
+
+- frontend app URL
+  Example: `https://app.your-domain.com`
+- backend API URL
+  Example: `https://api.your-domain.com`
+- set `NEXT_PUBLIC_API_URL` in the frontend env to your backend URL
+- set `CORS_ORIGINS` in the backend env to include your frontend URL
+- generate your own Supabase redirect/auth URLs based on your chosen frontend domain
+
+No production URL is intentionally embedded in this repository.
+
+## Download And Use
+
+```bash
+git clone https://github.com/Riccardo-RG/sourceai.git
+cd sourceai
+```
+
+Then:
+
+1. Configure `backend/.env` from `backend/.env.example`
+2. Configure `frontend/.env.local` from `frontend/.env.example`
+3. Start the backend on port `8000`
+4. Start the frontend on port `3000`
+5. Open `http://localhost:3000`
+
 ## Current State
 
 This repository is a working product prototype, not a finished SaaS.
@@ -140,11 +194,12 @@ What still deserves follow-up:
 - automated tests
 - more decomposition of large orchestrator components and services
 
-## Notes For Reviewers
+## Recruiter Notes
 
 - The app includes internal product copy in Italian because the original target audience is Italian sellers.
 - Some scores are intentionally AI-derived and should not be read as verified metrics.
 - Supplier links are deterministic search links, while supplier cards discovered from Tavily remain indicative.
+- The repo is intentionally portable: no live credentials and no public deployment URL are included.
 
 ## Commands
 
