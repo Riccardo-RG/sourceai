@@ -360,6 +360,7 @@ async def _search_real_suppliers(
     market: str,
     positioning: str,
     supplier_context: str = "",
+    profile: dict | None = None,
 ) -> tuple[list[dict], str]:
     """
     Triple Tavily search: platform directory + open web + optional 3rd niche platform.
@@ -411,6 +412,13 @@ async def _search_real_suppliers(
         web_sq = f"{query} {terms['drop']} {geo}"
     else:
         web_sq = f"{query} {terms['wholesale']} manufacturer B2B {geo}"
+
+    # ── Profile-based enrichment (certifications, private label) ────────────
+    plat_extra, web_extra = _profile_supplier_enrichments(profile)
+    if plat_extra:
+        platform_sq += f" {plat_extra}"
+    if web_extra:
+        web_sq += f" {web_extra}"
 
     # ── Optional 3rd platform (niche enrichment) ─────────────────────────────
     third_site = _THIRD_PLATFORM.get((positioning, market_upper)) or _THIRD_PLATFORM.get((positioning, "GLOBAL"))
@@ -529,6 +537,153 @@ _LANG_NAMES = {
     "de": "German", "pt": "Portuguese", "ja": "Japanese", "en": "English",
 }
 
+# ── Profile helpers ─────────────────────────────────────────────────────────
+
+_BIZ_MODEL_LABELS = {
+    "dropshipping": "Dropshipping (no inventory, direct supplier-to-customer fulfillment)",
+    "stock": "Own stock (buy and hold inventory)",
+    "misto": "Hybrid (part own stock, part dropshipping)",
+}
+_PRICE_TIER_LABELS = {
+    "economy": "Economy (under €20)",
+    "mid": "Mid-range (€20–80)",
+    "premium": "Premium (€80–200)",
+    "luxury": "Luxury (over €200)",
+}
+_MOQ_LABELS = {
+    "under50": "Under 50 units",
+    "50to200": "50–200 units",
+    "200to500": "200–500 units",
+    "500plus": "500+ units",
+    "any": "No limit",
+}
+_BUDGET_LABELS = {
+    "under500": "Under €500",
+    "500to2k": "€500–2,000",
+    "2kto10k": "€2,000–10,000",
+    "10kto50k": "€10,000–50,000",
+    "50kplus": "€50,000+",
+}
+_MARGIN_LABELS = {
+    "10to20": "10–20%",
+    "20to35": "20–35%",
+    "35to50": "35–50%",
+    "50plus": "50%+",
+}
+_CERT_SEARCH_TERMS: dict[str, str] = {
+    "CE": "CE certified",
+    "FDA": "FDA approved",
+    "BPA-free": "BPA-free",
+    "organic": "organic certified",
+    "fair_trade": "fair trade certified",
+    "cruelty_free": "cruelty free",
+    "iso9001": "ISO 9001",
+    "rohs": "RoHS compliant",
+}
+
+
+def _profile_supplier_enrichments(profile: dict | None) -> tuple[str, str]:
+    """Returns (platform_extra, web_extra) keyword strings to append to Tavily supplier queries."""
+    if not profile:
+        return "", ""
+    platform_parts: list[str] = []
+    web_parts: list[str] = []
+
+    if profile.get("private_label") in ("yes", "interested"):
+        platform_parts.append("OEM private label")
+        web_parts.append("private label manufacturer OEM")
+
+    certs: list[str] = profile.get("certifications", []) or []
+    cert_terms = [_CERT_SEARCH_TERMS[c] for c in certs[:2] if c in _CERT_SEARCH_TERMS]
+    if cert_terms:
+        joined = " ".join(cert_terms)
+        platform_parts.append(joined)
+        web_parts.append(joined)
+
+    return " ".join(platform_parts), " ".join(web_parts)
+
+
+def _build_profile_note(profile: dict | None) -> str:
+    """Build a natural-language seller profile section for the Claude prompt."""
+    if not profile:
+        return ""
+    parts: list[str] = []
+
+    bm = profile.get("business_model", "")
+    if bm:
+        parts.append(f"Business model: {_BIZ_MODEL_LABELS.get(bm, bm)}")
+
+    channels: list[str] = profile.get("selling_channels", []) or []
+    if channels:
+        parts.append(f"Selling channels: {', '.join(channels)}")
+
+    pt = profile.get("price_tier", "")
+    if pt:
+        parts.append(f"Price tier: {_PRICE_TIER_LABELS.get(pt, pt)}")
+
+    tc: list[str] = profile.get("target_customer", []) or []
+    if tc:
+        parts.append(f"Target customer: {', '.join(tc)}")
+
+    moq = profile.get("moq_tolerance", "")
+    if moq:
+        parts.append(f"MOQ tolerance: {_MOQ_LABELS.get(moq, moq)}")
+
+    pl = profile.get("private_label", "")
+    if pl:
+        parts.append(f"Private label / OEM: {pl}")
+
+    certs: list[str] = profile.get("certifications", []) or []
+    if certs:
+        parts.append(f"Required certifications: {', '.join(certs)}")
+
+    lt = profile.get("lead_time", "")
+    if lt:
+        parts.append(f"Max lead time: {lt}")
+
+    budget = profile.get("initial_budget", "")
+    if budget:
+        parts.append(f"Initial order budget: {_BUDGET_LABELS.get(budget, budget)}")
+
+    margin = profile.get("target_margin", "")
+    if margin:
+        parts.append(f"Target net margin: {_MARGIN_LABELS.get(margin, margin)}")
+
+    specs = (profile.get("product_specs") or "").strip()
+    if specs:
+        parts.append(f"Product specs: {specs}")
+
+    reqs = (profile.get("special_requirements") or "").strip()
+    if reqs:
+        parts.append(f"Special requirements: {reqs}")
+
+    if not parts:
+        return ""
+
+    note = "\n\n**Seller profile (calibrate scoring and recommendations accordingly):**\n"
+    note += "\n".join(f"- {p}" for p in parts)
+
+    warnings: list[str] = []
+    if margin:
+        warnings.append(
+            f"IMPORTANT: Seller targets {_MARGIN_LABELS.get(margin, margin)} net margin — "
+            "adjust margin_potential score and margin_note commentary to reflect whether this product can realistically hit that target."
+        )
+    if certs:
+        warnings.append(
+            f"IMPORTANT: Certifications required: {', '.join(certs)} — "
+            "mention certification availability/difficulty in sourcing_note and verdict."
+        )
+    if moq and moq == "under50":
+        warnings.append(
+            "IMPORTANT: Seller needs MOQ under 50 units — "
+            "prioritize low-MOQ platforms (AliExpress, Spocket, Ankorstore) in sourcing_note."
+        )
+    if warnings:
+        note += "\n" + "\n".join(warnings)
+
+    return note
+
 
 async def _run_ai(
     query: str,
@@ -536,6 +691,7 @@ async def _run_ai(
     market: str = "GLOBAL",
     context: dict | None = None,
     lang: str = "en",
+    profile: dict | None = None,
 ) -> dict:
     from app.services.trends_service import get_trends_data
 
@@ -577,7 +733,7 @@ async def _run_ai(
                 settings.tavily_api_key,
                 market_sq,
             ),
-            _search_real_suppliers(settings.tavily_api_key, query, market, positioning, supplier_ctx),
+            _search_real_suppliers(settings.tavily_api_key, query, market, positioning, supplier_ctx, profile),
         ]
         results = await asyncio.gather(*tasks)
         trends_data = results[0]
@@ -617,6 +773,8 @@ async def _run_ai(
     business_model = _CHANNEL_LABELS.get((category or "").lower(), "Not specified")
     product_category = category if category not in _CHANNEL_LABELS else "unspecified"
 
+    profile_note = _build_profile_note(profile)
+
     prompt = USER_PROMPT.format(
         query=query,
         category=product_category,
@@ -629,7 +787,7 @@ async def _run_ai(
         amazon_results=amazon_text[:2500],
         market_results=market_text[:2000],
         supplier_results=supplier_text[:2000],
-    ) + context_note + lang_instruction
+    ) + context_note + profile_note + lang_instruction
 
     response = await client.messages.create(
         model="claude-sonnet-4-6",
@@ -673,6 +831,7 @@ async def analyze_product(
     market: str = "US",
     context: dict | None = None,
     lang: str = "en",
+    profile: dict | None = None,
 ) -> dict:
     positioning = (context or {}).get("positioning", "unknown")
     normalized = _normalize_query(f"{query}_{market.upper()}_{positioning}")
@@ -701,7 +860,7 @@ async def analyze_product(
         data = _mock_response(query, market, positioning)
     else:
         try:
-            data = await _run_ai(query, category, market, context, lang)
+            data = await _run_ai(query, category, market, context, lang, profile)
         except Exception as e:
             import logging
             logging.getLogger(__name__).error("AI pipeline failed: %s", e)

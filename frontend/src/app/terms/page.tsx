@@ -50,7 +50,7 @@ export default function TermsPage() {
       </Section>
 
       <Section title="6. Limitazione di responsabilità">
-        <p>SourceAI è fornito "così com'è". Non ci assumiamo responsabilità per:</p>
+        <p>SourceAI &egrave; fornito &quot;cos&igrave; com&apos;&egrave;&quot;. Non ci assumiamo responsabilit&agrave; per:</p>
         <ul className="list-disc list-inside space-y-1.5 mt-2">
           <li>Decisioni di acquisto o investimento basate sui dati mostrati</li>
           <li>Interruzioni del servizio dovute a manutenzione o guasti delle API terze</li>

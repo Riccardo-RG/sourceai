@@ -4,17 +4,6 @@ import { SourcingLink } from '@/types'
 import { useT } from '@/hooks/useT'
 import { useSavedSuppliersStore } from '@/store/savedSuppliersStore'
 
-const PLATFORM_ICONS: Record<string, string> = {
-  Alibaba: '🏭',
-  AliExpress: '📦',
-  'Made-in-China': '🇨🇳',
-  Europages: '🇪🇺',
-  Spocket: '🚀',
-  DHgate: '🏪',
-  Ankorstore: '🎨',
-  Faire: '✦',
-}
-
 export default function SourcingLinks({ links, query }: { links: SourcingLink[]; query: string }) {
   const t = useT()
   const { save, remove, isSaved, suppliers } = useSavedSuppliersStore()

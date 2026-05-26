@@ -12,12 +12,18 @@ export default function OutreachTracker() {
   const t = useT()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [noteInput, setNoteInput] = useState<Record<string, string>>({})
+  const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
     if (!initialized) return
     if (user) hydrate()
     else reset()
   }, [user, initialized, hydrate, reset])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNow(Date.now()), 60000)
+    return () => window.clearInterval(intervalId)
+  }, [])
 
   const statusConfig: Record<OutreachStatus, { label: string; color: string }> = {
     inviato:    { label: t.ot_status_sent,        color: 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800' },
@@ -30,7 +36,7 @@ export default function OutreachTracker() {
   const STATUS_ORDER: OutreachStatus[] = ['inviato', 'in_attesa', 'risposto', 'trattativa', 'chiuso']
 
   function timeAgo(date: Date): string {
-    const diff = Date.now() - date.getTime()
+    const diff = Math.max(0, now - date.getTime())
     const mins = Math.floor(diff / 60000)
     const hours = Math.floor(diff / 3600000)
     const days = Math.floor(diff / 86400000)

@@ -2,11 +2,10 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useMiriamStore } from '@/store/miriamStore'
-import { streamMiriam, clarifyQuery } from '@/lib/api'
+import { streamMiriam } from '@/lib/api'
 import { useT } from '@/hooks/useT'
-import { useLangStore } from '@/store/langStore'
-import MiriamOptionsPanel from '@/components/sections/MiriamOptionsPanel'
-import type { SearchContext, SupplierCard, SearchOptions } from '@/types'
+import { useSearchProfileStore } from '@/store/searchProfileStore'
+import type { SearchContext, SupplierCard } from '@/types'
 
 interface Props {
   onSearch: (query: string, category?: string, market?: string, context?: SearchContext) => void
@@ -17,6 +16,8 @@ const MIN_WIDTH = 260
 const MAX_WIDTH = 720
 const MIN_HEIGHT = 200
 const MAX_HEIGHT = 900
+const EMPTY_MESSAGES: Array<{ role: 'user' | 'assistant'; content: string; suppliers?: SupplierCard[] }> = []
+const EMPTY_SUPPLIERS: string[] = []
 
 const SUPPLIER_URLS: Record<string, (q: string) => string> = {
   'Alibaba':       (q) => `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(q)}`,
@@ -31,9 +32,15 @@ const SUPPLIER_URLS: Record<string, (q: string) => string> = {
 }
 
 const PLATFORM_ICONS: Record<string, string> = {
-  'Alibaba': '🏭', 'AliExpress': '📦', 'Europages': '🇪🇺',
-  'Ankorstore': '🎨', 'Faire': '✦', 'DHgate': '🏪',
-  'Made-in-China': '🇨🇳', 'Spocket': '🚀', 'Mercado Libre': '🛒',
+  'Alibaba': '🏭',
+  'AliExpress': '📦',
+  'Europages': '🇪🇺',
+  'Ankorstore': '🎨',
+  'Faire': '✦',
+  'DHgate': '🏪',
+  'Made-in-China': '🇨🇳',
+  'Spocket': '🚀',
+  'Mercado Libre': '🛒',
 }
 
 const PLATFORM_DESCRIPTIONS: Record<string, string> = {
@@ -65,66 +72,53 @@ export default function MiriamChat({ onSearch }: Props) {
     isStreaming, pendingAdvice,
     createThread, deleteThread, switchThread,
     addMessage, setContext, setMinimized, setWidth, setHeight, setPosition,
-    setIsStreaming, clearPendingAdvice, reset,
+    setIsStreaming, clearPendingAdvice,
   } = useMiriamStore()
 
-  const lang = useLangStore((s) => s.lang)
+  const { setOpen: openQuestionnaire, hasProfile } = useSearchProfileStore()
 
   // Derived: active thread data
   const activeThread = useMemo(
     () => threads.find((t) => t.id === activeThreadId) ?? threads[0],
     [threads, activeThreadId],
   )
-  const messages = activeThread?.messages ?? []
+  const messages = activeThread?.messages ?? EMPTY_MESSAGES
   const context = activeThread?.context ?? null
-  const foundSuppliers = activeThread?.foundSuppliers ?? []
+  const foundSuppliers = activeThread?.foundSuppliers ?? EMPTY_SUPPLIERS
   const viabilitySummary = activeThread?.viabilitySummary ?? null
 
   const [input, setInput] = useState('')
   const [streamingText, setStreamingText] = useState('')
-  const [pendingOptions, setPendingOptions] = useState<SearchOptions | null>(null)
-  const [optionsLoading, setOptionsLoading] = useState(false)
   const [threadPickerOpen, setThreadPickerOpen] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const wasDragging = useRef(false)
   const hasWelcomed = useRef(false)
+  const prevMessageCount = useRef(messages.length)
 
-  // Reset pending options when switching threads
+  // Close thread picker when switching threads
   useEffect(() => {
-    setPendingOptions(null)
-    setOptionsLoading(false)
     setThreadPickerOpen(false)
   }, [activeThreadId])
 
-  // Welcome message on first load / after clear
   useEffect(() => {
-    if (messages.length === 0) hasWelcomed.current = false
-    if (!hasWelcomed.current) {
-      hasWelcomed.current = true
-      if (messages.length === 0) addMessage({ role: 'assistant', content: t.miriam_welcome })
-    }
-  }, []) // eslint-disable-line
+    const clearedThread = prevMessageCount.current > 0 && messages.length === 0
 
-  useEffect(() => {
-    if (messages.length === 0 && hasWelcomed.current) {
+    if (messages.length === 0 && (!hasWelcomed.current || clearedThread)) {
+      hasWelcomed.current = true
       addMessage({ role: 'assistant', content: t.miriam_welcome })
+    } else if (messages.length > 0) {
+      hasWelcomed.current = true
     }
-  }, [messages.length]) // eslint-disable-line
+
+    prevMessageCount.current = messages.length
+  }, [messages.length, addMessage, t.miriam_welcome])
 
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamingText])
-
-  // CTA-triggered advice
-  useEffect(() => {
-    if (!pendingAdvice || isStreaming) return
-    const msg = buildAdviceMessage(pendingAdvice.query, pendingAdvice.viability)
-    clearPendingAdvice()
-    sendMessage(msg, true)
-  }, [pendingAdvice]) // eslint-disable-line
 
   const parseSignal = useCallback(
     (signal: string): void => {
@@ -199,28 +193,19 @@ export default function MiriamChat({ onSearch }: Props) {
       const userMsg = text.trim()
       setInput('')
       if (!silent) addMessage({ role: 'user', content: userMsg })
-
-      // Pre-search: no context yet → show options panel
-      if (context === null) {
-        setOptionsLoading(true)
-        setPendingOptions(null)
-        setHeight(Math.max(height, 520))
-        setMinimized(false)
-        try {
-          const opts = await clarifyQuery(userMsg, lang)
-          setPendingOptions(opts)
-        } catch {
-          await runChatStream(userMsg)
-        } finally {
-          setOptionsLoading(false)
-        }
-        return
-      }
-
+      setMinimized(false)
       await runChatStream(userMsg)
     },
-    [messages, isStreaming, context, lang, height, addMessage, setIsStreaming, setHeight, setMinimized, runChatStream], // eslint-disable-line
+    [isStreaming, addMessage, setMinimized, runChatStream],
   )
+
+  // CTA-triggered advice
+  useEffect(() => {
+    if (!pendingAdvice || isStreaming) return
+    const msg = buildAdviceMessage(pendingAdvice.query, pendingAdvice.viability)
+    clearPendingAdvice()
+    sendMessage(msg, true)
+  }, [pendingAdvice, isStreaming, clearPendingAdvice, sendMessage])
 
   // ─── Drag to move panel ──────────────────────────────────────────────────
   const startPanelDrag = useCallback(
@@ -243,7 +228,6 @@ export default function MiriamChat({ onSearch }: Props) {
         if (!wasDragging.current && Math.hypot(dx, dy) < 4) return
         wasDragging.current = true
         const panelW = rect.width
-        const panelH = minimized ? HEADER_HEIGHT : height
         const newX = Math.max(0, Math.min(window.innerWidth - panelW, startLeft + dx))
         const newY = Math.max(0, Math.min(window.innerHeight - HEADER_HEIGHT, startTop + dy))
         setPosition(Math.round(newX), Math.round(newY))
@@ -257,7 +241,7 @@ export default function MiriamChat({ onSearch }: Props) {
       window.addEventListener('mousemove', onMove)
       window.addEventListener('mouseup', onUp)
     },
-    [height, minimized, setPosition],
+    [setPosition],
   )
 
   // ─── Top edge: resize height ──────────────────────────────────────────────
@@ -389,6 +373,24 @@ export default function MiriamChat({ onSearch }: Props) {
           </svg>
         </button>
 
+        {/* Profile shortcut */}
+        <button
+          onClick={() => openQuestionnaire(true)}
+          title="Profilo prodotto"
+          className={`p-1 rounded transition-colors shrink-0 relative ${
+            hasProfile
+              ? 'text-primary hover:bg-primary/10'
+              : 'text-muted-foreground/40 hover:text-foreground hover:bg-muted/40'
+          }`}
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          {hasProfile && (
+            <span className="absolute top-0.5 right-0.5 w-1 h-1 rounded-full bg-primary" />
+          )}
+        </button>
+
         {/* New thread */}
         <button
           onClick={() => { createThread(); setThreadPickerOpen(false) }}
@@ -480,21 +482,22 @@ export default function MiriamChat({ onSearch }: Props) {
             {streamingText && (
               <MessageBubble role="assistant" content={streamingText} streaming />
             )}
-            {isStreaming && !streamingText && !optionsLoading && (
+            {isStreaming && !streamingText && (
               <p className="text-[11px] text-muted-foreground/60 italic">{t.miriam_typing}</p>
             )}
-            {(pendingOptions || optionsLoading) && (
-              <div className="mt-1">
-                <MiriamOptionsPanel
-                  options={pendingOptions}
-                  loading={optionsLoading}
-                  onConfirm={(refinedQuery, market, ctx) => {
-                    setPendingOptions(null)
-                    setContext(ctx)
-                    onSearch(refinedQuery, undefined, market, ctx)
-                  }}
-                  onCancel={() => setPendingOptions(null)}
-                />
+            {/* Questionnaire hint — shown when no search has been done yet */}
+            {!context && !isStreaming && messages.length <= 1 && !hasProfile && (
+              <div className="mx-0 px-2 py-1.5 rounded border border-dashed border-border/60">
+                <p className="text-[10px] text-muted-foreground/50 leading-relaxed">
+                  ⚡{' '}
+                  <button
+                    onClick={() => openQuestionnaire(true)}
+                    className="text-primary hover:underline"
+                  >
+                    Compila il profilo prodotto
+                  </button>
+                  {' '}per risultati più precisi — budget, MOQ, certificazioni...
+                </p>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -508,13 +511,13 @@ export default function MiriamChat({ onSearch }: Props) {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={t.miriam_placeholder}
-              disabled={isStreaming || optionsLoading || !!pendingOptions}
+              disabled={isStreaming}
               className="flex-1 resize-none text-xs bg-transparent outline-none placeholder:text-muted-foreground/50 text-foreground min-h-[24px] max-h-16 disabled:opacity-40"
               style={{ fieldSizing: 'content' } as React.CSSProperties}
             />
             <button
               onClick={() => sendMessage(input)}
-              disabled={isStreaming || !input.trim() || optionsLoading || !!pendingOptions}
+              disabled={isStreaming || !input.trim()}
               className="text-[10px] font-semibold px-2.5 py-1.5 rounded bg-primary text-primary-foreground disabled:opacity-30 hover:bg-primary/90 transition-colors shrink-0"
             >
               {t.miriam_send}

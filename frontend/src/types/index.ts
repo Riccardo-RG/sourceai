@@ -78,3 +78,18 @@ export interface SearchOptions {
   refined_query: string
   groups: SearchOptionsGroup[]
 }
+
+export interface SearchProfile {
+  selling_channels: string[]
+  business_model: string
+  price_tier: string
+  target_customer: string[]
+  moq_tolerance: string
+  private_label: string
+  certifications: string[]
+  lead_time: string
+  initial_budget: string
+  target_margin: string
+  product_specs: string
+  special_requirements: string
+}

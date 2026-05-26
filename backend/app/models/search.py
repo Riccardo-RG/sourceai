@@ -23,6 +23,7 @@ class SearchRequest(BaseModel):
     market: str = "GLOBAL"
     context: dict | None = None  # Miriam chat context: positioning, channel, etc.
     lang: str = "en"  # UI language for localized Claude responses
+    profile: dict | None = None  # Seller profile from questionnaire
 
 
 class SearchResponse(BaseModel):

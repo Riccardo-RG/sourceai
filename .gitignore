@@ -34,5 +34,14 @@ Thumbs.db
 .vscode/
 *.swp
 
+# ── Local AI tooling / workspace metadata ────────────
+.claude/
+.codex/
+CLAUDE.md
+AGENTS.md
+frontend/AGENTS.md
+frontend/CLAUDE.md
+
 # ── MCP (contiene token segreti) ─────────────────────
 .mcp.json
+.vercel

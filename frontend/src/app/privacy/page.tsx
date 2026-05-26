@@ -52,9 +52,9 @@ export default function PrivacyPage() {
       <Section title="5. I tuoi diritti (GDPR)">
         <p className="mb-2">Se sei un utente registrato puoi:</p>
         <ul className="list-disc list-inside space-y-1.5 text-sm text-muted-foreground">
-          <li><strong className="text-foreground">Accedere</strong> ai tuoi dati: outreach e scenari sono visibili nell'app</li>
-          <li><strong className="text-foreground">Cancellare</strong> i tuoi dati: puoi eliminare singoli record dall'app, o richiedere la cancellazione completa dell'account contattandoci</li>
-          <li><strong className="text-foreground">Portabilità</strong>: i tuoi dati sono esportabili su richiesta</li>
+          <li><strong className="text-foreground">Accedere</strong> ai tuoi dati: outreach e scenari sono visibili nell&apos;app</li>
+          <li><strong className="text-foreground">Cancellare</strong> i tuoi dati: puoi eliminare singoli record dall&apos;app, o richiedere la cancellazione completa dell&apos;account contattandoci</li>
+          <li><strong className="text-foreground">Portabilit&agrave;</strong>: i tuoi dati sono esportabili su richiesta</li>
           <li><strong className="text-foreground">Opposizione</strong>: puoi smettere di usare il servizio in qualsiasi momento</li>
         </ul>
         <p className="mt-3 text-sm text-muted-foreground">Per utenti anonimi (senza account): i dati sono legati al Session ID nel tuo browser. Cancellare i dati del browser rimuove il Session ID e dissocia tutti i dati anonimi.</p>
@@ -63,7 +63,7 @@ export default function PrivacyPage() {
       <Section title="6. Conservazione dei dati">
         <ul className="list-disc list-inside space-y-1.5 text-sm text-muted-foreground">
           <li>Cache ricerche: 24 ore</li>
-          <li>Outreach e scenari: fino alla cancellazione da parte dell'utente</li>
+          <li>Outreach e scenari: fino alla cancellazione da parte dell&apos;utente</li>
           <li>Log tecnici (Railway/Vercel): max 30 giorni</li>
         </ul>
       </Section>

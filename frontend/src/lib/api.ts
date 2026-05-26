@@ -63,6 +63,7 @@ export async function searchProduct(
   market = 'GLOBAL',
   context?: object,
   lang = 'en',
+  profile?: object,
 ): Promise<{
   viability: object
   sourcing_links: Array<{ platform: string; url: string; label: string; description: string }>
@@ -72,7 +73,7 @@ export async function searchProduct(
   const res = await fetch(`${API_URL}/api/search`, {
     method: 'POST',
     headers: await authHeaders(),
-    body: JSON.stringify({ query, category, session_id: userId, market, context, lang }),
+    body: JSON.stringify({ query, category, session_id: userId, market, context, lang, profile }),
   })
   if (!res.ok) throw new Error(`Search failed: ${res.status}`)
   return res.json()

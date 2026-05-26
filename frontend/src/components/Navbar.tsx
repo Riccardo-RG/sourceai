@@ -149,7 +149,6 @@ function AuthSection() {
 export default function Navbar() {
   const { theme, toggle } = useTheme()
   const { initialize, initialized } = useAuthStore()
-  const t = useT()
 
   useEffect(() => {
     if (!initialized) initialize()

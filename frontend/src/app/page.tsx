@@ -8,16 +8,17 @@ import SourcingLinks from '@/components/sections/SourcingLinks'
 import RealSuppliers from '@/components/sections/RealSuppliers'
 import OutreachTracker from '@/components/sections/OutreachTracker'
 import MiriamChat from '@/components/sections/MiriamChat'
-import MiriamOptionsPanel from '@/components/sections/MiriamOptionsPanel'
 import SavedSuppliers from '@/components/sections/SavedSuppliers'
-import { searchProduct, clarifyQuery } from '@/lib/api'
+import SearchQuestionnaire from '@/components/sections/SearchQuestionnaire'
+import { searchProduct } from '@/lib/api'
 import { useT } from '@/hooks/useT'
 import { useLangStore } from '@/store/langStore'
 import { useMiriamStore } from '@/store/miriamStore'
 import { useMarginStore } from '@/store/marginStore'
-import { SourcingLink, SearchContext, RealSupplier, SearchOptions } from '@/types'
+import { useSearchProfileStore } from '@/store/searchProfileStore'
+import { SourcingLink, SearchContext, RealSupplier } from '@/types'
 
-type Step = 'idle' | 'asking' | 'validating' | 'sourcing' | 'done' | 'error' | 'rate_limited'
+type Step = 'idle' | 'validating' | 'sourcing' | 'done' | 'error' | 'rate_limited'
 
 
 export default function Home() {
@@ -35,26 +36,12 @@ export default function Home() {
     return thread?.context ?? null
   })
   const { setMinimized, setContext, setFoundSuppliers, setViabilitySummary, triggerAdvice } = useMiriamStore()
-  const [searchOptions, setSearchOptions] = useState<SearchOptions | null>(null)
-  const [optionsLoading, setOptionsLoading] = useState(false)
+  const { profile, hasProfile, setOpen: openQuestionnaire } = useSearchProfileStore()
   const { setInput: setMarginInput, setPrefillNote } = useMarginStore()
 
-  // Called from ProductInput — shows options panel before launching search
-  const handleAnalyze = async (q: string, _category?: string, market = 'GLOBAL') => {
-    setQuery(q)
-    setCurrentMarket(market)
-    setStep('asking')
-    setSearchOptions(null)
-    setOptionsLoading(true)
-    try {
-      const opts = await clarifyQuery(q, lang)
-      setSearchOptions(opts)
-    } catch {
-      // API failed — fall back to direct search with no context
-      handleSearch(q, undefined, market)
-    } finally {
-      setOptionsLoading(false)
-    }
+  // Called from ProductInput — goes directly to search (questionnaire is optional, not blocking)
+  const handleAnalyze = (q: string, category?: string, market = 'GLOBAL') => {
+    handleSearch(q, category, market)
   }
 
   // Called when user confirms options, or directly from MiriamChat SEARCH_READY signal
@@ -70,7 +57,7 @@ export default function Home() {
     )
 
     try {
-      const data = await searchProduct(q, category, market, ctx ?? undefined, lang)
+      const data = await searchProduct(q, category, market, ctx ?? undefined, lang, hasProfile ? profile : undefined)
       setViabilityData(data.viability as Record<string, unknown>)
       setSourcingLinks(data.sourcing_links)
       const rs = data.real_suppliers ?? []
@@ -115,10 +102,6 @@ export default function Home() {
     }
   }
 
-  const handleConfirmOptions = useCallback((refinedQuery: string, market: string, ctx: SearchContext) => {
-    handleSearch(refinedQuery, undefined, market, ctx)
-  }, []) // eslint-disable-line
-
   const [verdictOpen, setVerdictOpen] = useState(false)
 
   const handleAdviceCta = useCallback(() => {
@@ -161,25 +144,28 @@ export default function Home() {
                 market={currentMarket}
                 isLoading={isLoading}
               />
+              {/* Questionnaire CTA */}
+              <button
+                onClick={() => openQuestionnaire(true)}
+                className="flex items-center gap-1.5 text-[11px] text-muted-foreground/50 hover:text-primary transition-colors group mt-1"
+              >
+                <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+                </svg>
+                <span>Personalizza la ricerca — budget, certificazioni, margine, MOQ...</span>
+                {hasProfile && (
+                  <span className="flex items-center gap-1 text-primary shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
+                    profilo attivo
+                  </span>
+                )}
+              </button>
             </div>
           </div>
         </section>
 
         {/* ── Results ──────────────────────────── */}
         <div className="max-w-5xl mx-auto px-6 py-10 space-y-12">
-
-          {/* Options panel (Miriam clarify) */}
-          {step === 'asking' && (
-            <section className="animate-in fade-in slide-in-from-bottom-3 duration-400">
-              <MiriamOptionsPanel
-                options={searchOptions}
-                loading={optionsLoading}
-                initialMarket={currentMarket}
-                onConfirm={handleConfirmOptions}
-                onCancel={() => setStep('idle')}
-              />
-            </section>
-          )}
 
           {/* Error */}
           {step === 'error' && (
@@ -231,7 +217,7 @@ export default function Home() {
           )}
 
           {/* Step 01 */}
-          {step !== 'idle' && step !== 'asking' && step !== 'error' && step !== 'rate_limited' && (
+          {step !== 'idle' && step !== 'error' && step !== 'rate_limited' && (
             <section className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
               <StepHeader number="01" label={t.step_01}
                 isLoading={step === 'validating'} loadingText={t.step_loading.replace('{query}', query)} />
@@ -297,7 +283,7 @@ export default function Home() {
           )}
 
           {/* How it works — idle only */}
-          {(step === 'idle') && (
+          {step === 'idle' && (
             <section className="animate-in fade-in duration-500">
               <p className="text-[10px] font-semibold tracking-widest text-muted-foreground/50 uppercase mb-6">
                 {t.how_title}
@@ -339,6 +325,9 @@ export default function Home() {
 
       {/* Saved suppliers panel — fixed bottom-left, hidden when empty */}
       <SavedSuppliers />
+
+      {/* Search profile questionnaire modal */}
+      <SearchQuestionnaire />
     </>
   )
 }

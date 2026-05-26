@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/store/authStore'
 import { useT } from '@/hooks/useT'
@@ -18,7 +17,6 @@ function GoogleIcon() {
 }
 
 export default function SignupPage() {
-  const router = useRouter()
   const { signUp, signInWithGoogle, loading } = useAuthStore()
   const t = useT()
   const [email, setEmail] = useState('')
