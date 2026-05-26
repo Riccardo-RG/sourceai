@@ -11,6 +11,8 @@ It combines real market signals, indicative web research, and AI reasoning in a 
 
 The product is opinionated about data reliability: uncertain data should be labeled, not presented as fact.
 
+This public repository is intentionally shipped without a live demo URL because the app depends on paid third-party APIs. Anyone can run their own copy locally or deploy their own instance with their own credentials.
+
 ## Portfolio Blurb
 
 SourceAI is an AI-native sourcing and market-validation tool for e-commerce sellers. I built it as a full-stack system that combines structured market data, web research, and LLM reasoning while explicitly separating verified signals from indicative data and AI estimates. The project showcases product thinking, multi-source backend orchestration, streaming AI UX, and data-reliability constraints applied end to end.
@@ -37,6 +39,14 @@ See [DATA_SOURCES.md](./DATA_SOURCES.md) for the detailed mapping between each U
 - supplier outreach tracker
 - Supabase authentication and persistence
 - multilingual UI with custom Zustand-based i18n (`EN`, `IT`, `ES`)
+
+## What This Project Demonstrates
+
+- product thinking around data trust and decision support
+- full-stack architecture across frontend, backend, auth, and persistence
+- multi-source orchestration of AI and external APIs
+- streaming AI UX with structured control signals
+- environment-safe distribution of a project that depends on paid APIs
 
 ## Tech Stack
 
@@ -162,6 +172,23 @@ If you want to publish your own instance, generate your own URLs and wire them l
 
 No production URL is intentionally embedded in this repository.
 
+## Code Tour
+
+If you want to review the project quickly, start here:
+
+- [backend/app/services/ai_service.py](./backend/app/services/ai_service.py)
+  main analysis pipeline, supplier enrichment, multi-source orchestration
+- [backend/app/services/chat_service.py](./backend/app/services/chat_service.py)
+  Miriam streaming behavior and signal emission
+- [backend/app/services/trends_service.py](./backend/app/services/trends_service.py)
+  Google Trends integration and market normalization
+- [frontend/src/app/page.tsx](./frontend/src/app/page.tsx)
+  main product flow tying search, results, and downstream tools together
+- [frontend/src/components/sections/MiriamChat.tsx](./frontend/src/components/sections/MiriamChat.tsx)
+  recruiter-relevant frontend logic: SSE handling, structured signals, and conversation UX
+- [DATA_SOURCES.md](./DATA_SOURCES.md)
+  the product’s most important rule: what is real, indicative, or AI-estimated
+
 ## Download And Use
 
 ```bash
@@ -200,6 +227,7 @@ What still deserves follow-up:
 - Some scores are intentionally AI-derived and should not be read as verified metrics.
 - Supplier links are deterministic search links, while supplier cards discovered from Tavily remain indicative.
 - The repo is intentionally portable: no live credentials and no public deployment URL are included.
+- The strongest part of the project is not the UI alone, but the data-integrity rules enforced across product, prompt design, and backend orchestration.
 
 ## Commands
 

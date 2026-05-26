@@ -67,7 +67,7 @@ export default function TermsPage() {
       </Section>
 
       <Section title="9. Contatti">
-        <p>Per una pubblicazione reale, configura qui il tuo indirizzo legale o di supporto.</p>
+        <p>Le informazioni di contatto sono state intenzionalmente omesse nella versione portfolio pubblica del progetto.</p>
       </Section>
     </div>
   )

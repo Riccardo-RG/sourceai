@@ -68,7 +68,7 @@ export default function PrivacyPage() {
       </Section>
 
       <Section title="7. Contatti">
-        <p>Per una pubblicazione reale, configura qui il tuo indirizzo privacy o supporto.</p>
+        <p>Le informazioni di contatto sono state intenzionalmente omesse nella versione portfolio pubblica del progetto.</p>
       </Section>
     </div>
   )
