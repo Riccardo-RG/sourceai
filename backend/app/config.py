@@ -11,8 +11,6 @@ class Settings(BaseSettings):
     dataforseo_password: str = ""
     cors_origins: list[str] = [
         "http://localhost:3000",
-        "https://frontend-black-psi-94.vercel.app",
-        "https://*.vercel.app",
     ]
 
     model_config = ConfigDict(env_file=".env", case_sensitive=False)
